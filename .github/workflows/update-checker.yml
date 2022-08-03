@@ -12,9 +12,9 @@
 name: Update_Checker
 
 env:
-  REPO_URL_Lede: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH_Lede: openwrt-21.02
-  REPO_PATH_Lede : "lede"
+  REPO_URL_Immortalwrt: https://github.com/immortalwrt/immortalwrt
+  REPO_BRANCH_Immortalwrt: openwrt-21.02
+  REPO_PATH_Immortalwrt : "immortalwrt"
   
   REPO_URL_HelloWorld: https://github.com/fw876/helloworld
   REPO_BRANCH_HelloWorld: master
@@ -36,9 +36,9 @@ jobs:
       id: getHash
       run: |
       
-        git clone --depth 1 $REPO_URL_Lede -b $REPO_BRANCH_Lede $REPO_PATH_Lede
-        cd $REPO_PATH_Lede
-        echo "::set-output name=commitHash_Lede::$(git rev-parse HEAD)"
+        git clone --depth 1 $REPO_URL_Immortalwrt -b $REPO_BRANCH_Immortalwrt $REPO_PATH_Immortalwrt
+        cd $REPO_PATH_Immortalwrt
+        echo "::set-output name=commitHash_Immortalwrt::$(git rev-parse HEAD)"
         cd
 
         git clone --depth 1 $REPO_URL_HelloWorld -b $REPO_BRANCH_HelloWorld $REPO_PATH_HelloWorld 
@@ -49,11 +49,11 @@ jobs:
     - name: Show Commit Head and Combination Heads
       id: combHeader
       run: |
-        echo "commitHash_Lede: ${{ steps.getHash.outputs.commitHash_Lede }}"
+        echo "commitHash_Immortalwrt: ${{ steps.getHash.outputs.commitHash_Immortalwrt }}"
         echo "commitHash_HelloWorld: ${{ steps.getHash.outputs.commitHash_HelloWorld }}"
         echo "::set-output name=commitHash_All::\
-          ${{steps.getHash.outputs.commitHash_Lede}}\
-          ${{steps.getHash.outputs.commitHash_HelloWorld}}
+          ${{steps.getHash.outputs.commitHash_Immortalwrt}}\
+          ${{steps.getHash.outputs.commitHash_HelloWorld}}"
 
     - name: Compare Commit Hash
       id: cacheHash
@@ -66,7 +66,7 @@ jobs:
     - name: Save New Commit Hash
       if: steps.cacheHash.outputs.cache-hit != 'true'
       run: |
-        echo ${{ steps.getHash.outputs.commitHash_Lede }} | tee .commitHash_Lede
+        echo ${{ steps.getHash.outputs.commitHash_Immortalwrt }} | tee .commitHash_Immortalwrt
         echo ${{ steps.getHash.outputs.commitHash_HelloWorld }} | tee .commitHash_HelloWorld
         echo ${{ steps.combHeader.outputs.commitHash_All }} | tee .commitHash_All   
         
