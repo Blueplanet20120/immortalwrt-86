@@ -74,7 +74,7 @@ jobs:
       if: steps.cacheHash.outputs.cache-hit != 'true'
       uses: peter-evans/repository-dispatch@v1
       with:
-        token: ${{ secrets.TES_TOKEN }}
+        token: ${{ secrets.op_update  }}
         event-type: Source Code Update
 
     - name: Delete workflow runs
