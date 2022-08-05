@@ -63,16 +63,14 @@ lenyu_version="`date '+%y%m%d%H%M'`_sta_Len yu"
 echo $lenyu_version >  wget/DISTRIB_REVISION1 
 echo $lenyu_version | cut -d _ -f 1 >  files/etc/lenyu_version  
 #######
-#new_DISTRIB_REVISION=`cat  wget/DISTRIB_REVISION1`
-#grep "DISTRIB_REVISION="  package/emortal/default-settings/files/99-default-settings | cut -d \' -f 2 >  wget/DISTRIB_REVISION3
-#old_DISTRIB_REVISION=`cat  wget/DISTRIB_REVISION3`
-#sed -i "s/${old_DISTRIB_REVISION}/${new_DISTRIB_REVISION}/"   package/emortal/default-settings/files/99-default-settings
 #
 grep "Check_Update.sh"  package/emortal/default-settings/files/99-default-settings
 if [ $? != 0 ]; then
 	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
 	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
 	sed -i '$ a alias lenyu="bash /usr/share/Check_Update.sh"' /etc/profile
+	sed -i '/DISTRIB_DESCRIPTION/d' /etc/openwrt_release
+	echo "DISTRIB_DESCRIPTION='2208052057_5.4.203_sta_Lenyu'" >> /etc/openwrt_release
 	exit 0
 	EOF
 fi
