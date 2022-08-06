@@ -70,7 +70,7 @@ if [ $? != 0 ]; then
 	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
 	sed -i '$ a alias lenyu="bash /usr/share/Check_Update.sh"' /etc/profile
 	sed -i '/DISTRIB_DESCRIPTION/d' /etc/openwrt_release
-	echo "DISTRIB_DESCRIPTION=$new_DISTRIB_REVISION" >> /etc/openwrt_release
+	echo "DISTRIB_DESCRIPTION='$new_DISTRIB_REVISION'" >> /etc/openwrt_release
 	exit 0
 	EOF
 fi
