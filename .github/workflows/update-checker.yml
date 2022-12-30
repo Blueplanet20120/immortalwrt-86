@@ -38,12 +38,12 @@ jobs:
       
         git clone --depth 1 $REPO_URL_Immortalwrt -b $REPO_BRANCH_Immortalwrt $REPO_PATH_Immortalwrt
         cd $REPO_PATH_Immortalwrt
-        echo "::set-output name=commitHash_Immortalwrt::$(git rev-parse HEAD)"
+        echo "commitHash_Lede=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
         cd
 
         git clone --depth 1 $REPO_URL_HelloWorld -b $REPO_BRANCH_HelloWorld $REPO_PATH_HelloWorld 
         cd $REPO_PATH_HelloWorld
-        echo "::set-output name=commitHash_HelloWorld::$(git rev-parse HEAD)"
+        echo "commitHash_HelloWorld=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
         cd
         
     - name: Show Commit Head and Combination Heads
@@ -51,13 +51,13 @@ jobs:
       run: |
         echo "commitHash_Immortalwrt: ${{ steps.getHash.outputs.commitHash_Immortalwrt }}"
         echo "commitHash_HelloWorld: ${{ steps.getHash.outputs.commitHash_HelloWorld }}"
-        echo "::set-output name=commitHash_All::\
+        echo "commitHash_All=\
           ${{steps.getHash.outputs.commitHash_Immortalwrt}}\
           ${{steps.getHash.outputs.commitHash_HelloWorld}}"
 
     - name: Compare Commit Hash
       id: cacheHash
-      uses: actions/cache@v2
+      uses: actions/cache@v3.0.11
       with:
         path: .commitHash_All
         key: HEAD-${{ steps.combHeader.outputs.commitHash_All }}
@@ -78,7 +78,7 @@ jobs:
         event-type: Source Code Update
 
     - name: Delete workflow runs
-      uses: GitRML/delete-workflow-runs@main
+      uses: Blueplanet20120/delete-workflow-runs@main
       with:
         retain_days: 1
         keep_minimum_runs: 1
