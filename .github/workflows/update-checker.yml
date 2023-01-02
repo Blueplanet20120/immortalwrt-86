@@ -53,7 +53,7 @@ jobs:
         echo "commitHash_HelloWorld: ${{ steps.getHash.outputs.commitHash_HelloWorld }}"
         echo "commitHash_All=\
           ${{steps.getHash.outputs.commitHash_Immortalwrt}}\
-          ${{steps.getHash.outputs.commitHash_HelloWorld}}"
+          ${{steps.getHash.outputs.commitHash_HelloWorld}}" >> $GITHUB_OUTPUT
 
     - name: Compare Commit Hash
       id: cacheHash
