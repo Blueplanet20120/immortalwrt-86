@@ -67,7 +67,7 @@ grep "Check_Update.sh"  package/emortal/default-settings/files/99-default-settin
 if [ $? != 0 ]; then
 	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
 	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
-	sed -i '$ a alias lenyu="bash /usr/share/Check_Update.sh"' /etc/profile
+	sed -i '$ a alias lenyu="sh /usr/share/Check_Update.sh"' /etc/profile
 	sed -i '/DISTRIB_DESCRIPTION/d' /etc/openwrt_release
 	echo "DISTRIB_DESCRIPTION='$new_DISTRIB_REVISION'" >> /etc/openwrt_release
 	exit 0
@@ -77,7 +77,7 @@ grep "Lenyu-auto.sh"  package/emortal/default-settings/files/99-default-settings
 if [ $? != 0 ]; then
 	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
 	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
-	sed -i '$ a alias lenyu-auto="bash /usr/share/Lenyu-auto.sh"' /etc/profile
+	sed -i '$ a alias lenyu-auto="sh /usr/share/Lenyu-auto.sh"' /etc/profile
 	exit 0
 	EOF
 fi
@@ -312,5 +312,3 @@ fi
 
 exit 0
 EOF
-
-
