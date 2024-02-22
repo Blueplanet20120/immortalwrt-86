@@ -90,10 +90,10 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
     
-    - name: luci-theme-argonn
-      run: |
-        cd openwrt/package 		
-        git clone -b 18.06 https://github.com/jerrykuku/luci-theme-argon.git luci-theme-argonn
+    #- name: luci-theme-argonn
+      #run: |
+        #cd openwrt/package 		
+        #git clone -b 18.06 https://github.com/jerrykuku/luci-theme-argon.git luci-theme-argonn
    
     - name: luci-app-romupdate
       run: |
