@@ -11,6 +11,10 @@
 #
 
 # Uncomment a feed source
+# Add a feed helloword
+sed -i "/helloworld/d" "feeds.conf.default"
+echo "src-git helloworld https://github.com/fw876/helloworld.git" >> "feeds.conf.default"
+
 # Add a feed source
 
 mkdir -p files/usr/share
