@@ -253,6 +253,13 @@ echo
 exit 0
 fi
 rm -f /tmp/cloud_version
+
+# 备份passwall配置文件
+if [ ! -d "/etc/passwall_backup" ]; then
+    mkdir /etc/passwall_backup
+fi
+cp -f /etc/config/passwall /etc/passwall_backup/passwall_backup
+
 # 获取固件云端版本号、内核版本号信息
 current_version=`cat /etc/lenyu_version`
 # wget -qO- -T2 "https://api.github.com/repos/Blueplanet20120/immortalwrt-86/releases/latest" | grep "tag_name" | head -n 1 | awk -F ":" '{print $2}' | sed 's/\"//g;s/,//g;s/ //g;s/v//g'  > /tmp/cloud_ts_version
