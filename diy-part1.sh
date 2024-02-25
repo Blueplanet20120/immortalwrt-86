@@ -26,6 +26,22 @@ touch wget/DISTRIB_REVISION3
 touch files/usr/share/Check_Update.sh
 touch files/usr/share/Lenyu-auto.sh
 
+# backup config
+cat>> package/base-files/files/lib/upgrade/keep.d/base-files-essential<<-EOF
+/etc/config/dhcp
+/etc/config/xray
+/etc/config/sing-box
+/etc/config/romupdate
+/etc/config/passwall_show
+/etc/config/passwall_server
+/etc/config/passwall
+/usr/share/v2ray/geosite.dat
+/usr/share/v2ray/geoip.dat
+/usr/share/passwall/rules/
+/usr/share/singbox/
+/usr/share/v2ray/
+EOF
+
 
 cat>rename.sh<<-\EOF
 #!/bin/bash
@@ -88,26 +104,6 @@ if [ $? != 0 ]; then
 	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
 	sed -i '$ a alias lenyu-auto="sh /usr/share/Lenyu-auto.sh"' /etc/profile
 	exit 0
-	EOF
-fi
-grep "passwall_backup"  package/emortal/default-settings/files/99-default-settings
-if [ $? != 0 ]; then
-	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
-	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
-		cat> /etc/rc.local<<-EOFF
-		# Put your custom commands here that should be executed once
-		# the system init finished. By default this file does nothing.
-		if [ -f "/etc/passwall_backup/passwall_backup" ]; then
-		cp -f /etc/passwall_backup/passwall_backup /etc/config/passwall
-		# Check if the copy operation was successful
-		  if [ $? -eq 0 ]; then
-			 touch /tmp/passwall_succ.log
-		  fi
-		rm -rf  /etc/passwall_backup/passwall_backup
-		fi
-		exit 0
-		EOFF
-		exit 0
 	EOF
 fi
 EOOF
@@ -273,12 +269,6 @@ echo
 exit 0
 fi
 rm -f /tmp/cloud_version
-
-# 备份passwall配置文件
-if [ ! -d "/etc/passwall_backup" ]; then
-    mkdir /etc/passwall_backup
-fi
-cp -f /etc/config/passwall /etc/passwall_backup/passwall_backup
 
 # 获取固件云端版本号、内核版本号信息
 current_version=`cat /etc/lenyu_version`
