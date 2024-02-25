@@ -90,6 +90,26 @@ if [ $? != 0 ]; then
 	exit 0
 	EOF
 fi
+grep "passwall_backup"  package/emortal/default-settings/files/99-default-settings
+if [ $? != 0 ]; then
+	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
+	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
+		cat> /etc/rc.local<<-EOFF
+		# Put your custom commands here that should be executed once
+		# the system init finished. By default this file does nothing.
+		if [ -f "/etc/passwall_backup/passwall_backup" ]; then
+		cp -f /etc/passwall_backup/passwall_backup /etc/config/passwall
+		# Check if the copy operation was successful
+		  if [ $? -eq 0 ]; then
+			 touch /tmp/passwall_succ.log
+		  fi
+		rm -rf  /etc/passwall_backup/passwall_backup
+		fi
+		exit 0
+		EOFF
+		exit 0
+	EOF
+fi
 EOOF
 
 cat>files/usr/share/Check_Update.sh<<-\EOF
