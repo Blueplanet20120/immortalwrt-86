@@ -6,10 +6,19 @@
 ![GitHub Stars](https://img.shields.io/github/stars/P3TERX/Actions-OpenWrt.svg?style=flat-square&label=Stars&logo=github)
 ![GitHub Forks](https://img.shields.io/github/forks/P3TERX/Actions-OpenWrt.svg?style=flat-square&label=Forks&logo=github)
 
-A template for building Immortalwrt with GitHub Actions
-- Automatic compiler based on immortalwrt project
-- Connect to the router ssh and run the lenyu or lenyu-auto command to automatically detect and update the firmware
-- It can be added to the router's scheduled tasks to achieve fully automated firmware update
+A template for building OpenWrt with GitHub Actions
+
+Main features:
+
+Firmware can be automatically updated;
+
+Automatic updates have a luci interface to facilitate online firmware updates for everyone.
+
+Luci plugin features:
+
+a. Scheduled and manual updates are available.
+
+b. Local and cloud firmware version numbers can be viewed.
 
 ## Thanks
 
