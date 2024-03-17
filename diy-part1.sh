@@ -29,7 +29,7 @@ touch files/usr/share/Lenyu-auto.sh
 # backup config
 cat>> package/base-files/files/lib/upgrade/keep.d/base-files-essential<<-EOF
 /etc/config/dhcp
-/etc/config/xray
+# /etc/config/xray
 /etc/config/sing-box
 /etc/config/romupdate
 /etc/config/passwall_show
