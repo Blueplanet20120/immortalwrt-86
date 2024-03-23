@@ -13,12 +13,12 @@ name: Update_Checker
 
 env:
   REPO_URL_Immortalwrt: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH_Immortalwrt: openwrt-21.02
+  REPO_BRANCH_Immortalwrt: openwrt-23.05
   REPO_PATH_Immortalwrt : "immortalwrt"
   
-  REPO_URL_HelloWorld: https://github.com/fw876/helloworld
-  REPO_BRANCH_HelloWorld: master
-  REPO_PATH_HelloWorld : "helloworld"
+  REPO_URL_openwrt-passwall: https://github.com/xiaorouji/openwrt-passwall
+  REPO_BRANCH_openwrt-passwall: main
+  REPO_PATH_openwrt-passwall : "openwrt-passwall"
 
 
 on:
@@ -41,19 +41,19 @@ jobs:
         echo "commitHash_Lede=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
         cd
 
-        git clone --depth 1 $REPO_URL_HelloWorld -b $REPO_BRANCH_HelloWorld $REPO_PATH_HelloWorld 
-        cd $REPO_PATH_HelloWorld
-        echo "commitHash_HelloWorld=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+        git clone --depth 1 $REPO_URL_openwrt-passwall -b $REPO_BRANCH_openwrt-passwall $REPO_PATH_openwrt-passwall 
+        cd $REPO_PATH_openwrt-passwall
+        echo "commitHash_openwrt-passwall=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
         cd
         
     - name: Show Commit Head and Combination Heads
       id: combHeader
       run: |
         echo "commitHash_Immortalwrt: ${{ steps.getHash.outputs.commitHash_Immortalwrt }}"
-        echo "commitHash_HelloWorld: ${{ steps.getHash.outputs.commitHash_HelloWorld }}"
+        echo "commitHash_openwrt-passwall: ${{ steps.getHash.outputs.commitHash_openwrt-passwall }}"
         echo "commitHash_All=\
           ${{steps.getHash.outputs.commitHash_Immortalwrt}}\
-          ${{steps.getHash.outputs.commitHash_HelloWorld}}" >> $GITHUB_OUTPUT
+          ${{steps.getHash.outputs.commitHash_openwrt-passwall}}" >> $GITHUB_OUTPUT
 
     - name: Compare Commit Hash
       id: cacheHash
@@ -67,7 +67,7 @@ jobs:
       if: steps.cacheHash.outputs.cache-hit != 'true'
       run: |
         echo ${{ steps.getHash.outputs.commitHash_Immortalwrt }} | tee .commitHash_Immortalwrt
-        echo ${{ steps.getHash.outputs.commitHash_HelloWorld }} | tee .commitHash_HelloWorld
+        echo ${{ steps.getHash.outputs.commitHash_openwrt-passwall }} | tee .commitHash_openwrt-passwall
         echo ${{ steps.combHeader.outputs.commitHash_All }} | tee .commitHash_All   
         
     - name: Trigger build
@@ -82,4 +82,3 @@ jobs:
       with:
         retain_days: 1
         keep_minimum_runs: 5
-        
