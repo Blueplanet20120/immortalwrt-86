@@ -25,13 +25,10 @@ jobs:
     - name: Get Commit Hash
       id: getHash
       run: |
-      
         git clone  -b openwrt-23.05 https://github.com/immortalwrt/immortalwrt immortalwrt --filter=blob:none
         cd immortalwrt
         echo "SHA_01=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         cd
-
-
         git clone -b main https://github.com/xiaorouji/openwrt-passwall openwrt-passwall --filter=blob:none
         cd openwrt-passwall
         echo "SHA_02=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
@@ -51,7 +48,6 @@ jobs:
         path: .commitHash_All
         key: HEAD-${{ steps.combHeader.outputs.commitHash_All }}
    
-
     - name: Save New Commit Hash
       if: steps.cacheHash.outputs.cache-hit != 'true'
       run: |
