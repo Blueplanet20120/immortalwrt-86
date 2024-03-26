@@ -18,7 +18,7 @@ env:
   
   REPO_URL_PassWall: https://github.com/xiaorouji/openwrt-passwall
   REPO_BRANCH_PassWall: main
-  REPO_PATH_PassWall : "passwall"
+  REPO_PATH_PassWall : "openwrt-passwall"
 
 
 on:
@@ -74,7 +74,7 @@ jobs:
       if: steps.cacheHash.outputs.cache-hit != 'true'
       uses: peter-evans/repository-dispatch@main
       with:
-        token: ${{ secrets.op_update  }}
+        token: ${{ secrets.OP_UPDATE  }}
         event-type: Source Code Update
 
     - name: Delete workflow runs
