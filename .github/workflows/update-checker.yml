@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2019-2021 smallprogram
+# Copyright (c) 2019-2024 smallprogram
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -10,16 +10,6 @@
 #
 
 name: Update_Checker
-
-env:
-  REPO_URL_Immortalwrt: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH_Immortalwrt: openwrt-23.05
-  REPO_PATH_Immortalwrt : "immortalwrt"
-  
-  REPO_URL_PassWall: https://github.com/xiaorouji/openwrt-passwall
-  REPO_BRANCH_PassWall: main
-  REPO_PATH_PassWall : "openwrt-passwall"
-
 
 on:
   workflow_dispatch:
@@ -36,24 +26,23 @@ jobs:
       id: getHash
       run: |
       
-        git clone --depth 1 $REPO_URL_Immortalwrt -b $REPO_BRANCH_Immortalwrt $REPO_PATH_Immortalwrt
-        cd $REPO_PATH_Immortalwrt
-        echo "commitHash_Lede=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+        git clone  -b openwrt-23.05 https://github.com/immortalwrt/immortalwrt immortalwrt
+        cd immortalwrt
+        echo "SHA_01=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         cd
 
-        git clone --depth 1 $REPO_URL_PassWall -b $REPO_BRANCH_PassWall $REPO_PATH_PassWall 
-        cd $REPO_PATH_PassWall
-        echo "commitHash_PassWall=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+        git clone https://github.com/xiaorouji/openwrt-passwall --filter=blob:none
+        cd openwrt-passwall
+        echo "SHA_02=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         cd
-        
+
     - name: Show Commit Head and Combination Heads
       id: combHeader
       run: |
-        echo "commitHash_Immortalwrt: ${{ steps.getHash.outputs.commitHash_Immortalwrt }}"
-        echo "commitHash_PassWall: ${{ steps.getHash.outputs.commitHash_PassWall }}"
         echo "commitHash_All=\
-          ${{steps.getHash.outputs.commitHash_Immortalwrt}}\
-          ${{steps.getHash.outputs.commitHash_PassWall}}" >> $GITHUB_OUTPUT
+          ${{steps.getHash.outputs.SHA_01}}\
+          ${{steps.getHash.outputs.SHA_02}}" >> $GITHUB_OUTPUT
 
     - name: Compare Commit Hash
       id: cacheHash
@@ -66,19 +55,29 @@ jobs:
     - name: Save New Commit Hash
       if: steps.cacheHash.outputs.cache-hit != 'true'
       run: |
-        echo ${{ steps.getHash.outputs.commitHash_Immortalwrt }} | tee .commitHash_Immortalwrt
-        echo ${{ steps.getHash.outputs.commitHash_PassWall }} | tee .commitHash_PassWall
-        echo ${{ steps.combHeader.outputs.commitHash_All }} | tee .commitHash_All   
+        echo ${{ steps.combHeader.outputs.commitHash_All }} | tee .commitHash_All
+        
+    - name: Delete workflow runs
+      uses: Mattraks/delete-workflow-runs@main
+      with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 1
+          keep_minimum_runs: 3
+
+    - name: Remove old Releases
+      uses: dev-drprasad/delete-older-releases@master
+      with:
+        keep_latest: 5
+        keep_min_download_counts: 2
+        delete_expired_data: 60
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.OP_UPDATE }}
         
     - name: Trigger build
       if: steps.cacheHash.outputs.cache-hit != 'true'
       uses: peter-evans/repository-dispatch@main
       with:
         token: ${{ secrets.OP_UPDATE  }}
-        event-type: Source Code Update
-
-    - name: Delete workflow runs
-      uses: Blueplanet20120/delete-workflow-runs@main
-      with:
-        retain_days: 1
-        keep_minimum_runs: 5
+        event-type: openwrt_source_update
