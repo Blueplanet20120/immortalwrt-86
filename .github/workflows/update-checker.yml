@@ -29,17 +29,17 @@ jobs:
         cd immortalwrt
         echo "SHA_01=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         cd
-        #git clone -b main https://github.com/xiaorouji/openwrt-passwall openwrt-passwall --filter=blob:none
-        #cd openwrt-passwall
-        #echo "SHA_02=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-        #cd
+        git clone -b main https://github.com/xiaorouji/openwrt-passwall openwrt-passwall --filter=blob:none
+        cd openwrt-passwall
+        echo "SHA_02=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        cd
 
     - name: Show Commit Head and Combination Heads
       id: combHeader
       run: |
         echo "commitHash_All=\
-          #${{steps.getHash.outputs.SHA_01}}\
-          ${{steps.getHash.outputs.SHA_01}}" >> $GITHUB_OUTPUT
+          ${{steps.getHash.outputs.SHA_01}}\
+          ${{steps.getHash.outputs.SHA_02}}" >> $GITHUB_OUTPUT
 
     - name: Compare Commit Hash
       id: cacheHash
