@@ -109,7 +109,7 @@ if [ $? != 0 ]; then
 	exit 0
 	EOF
 fi
-EOOF
+
 grep "xray_backup"  package/emortal/default-settings/files/99-default-settings
 if [ $? != 0 ]; then
 	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
@@ -131,7 +131,7 @@ if [ $? != 0 ]; then
 		exit 0
 	EOF
 fi
-
+EOOF
 cat>files/usr/share/Check_Update.sh<<-\EOF
 #!/bin/bash
 # https://github.com/Blueplanet20120/Actions-OpenWrt-x86
