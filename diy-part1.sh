@@ -114,7 +114,7 @@ grep "xray_backup"  package/emortal/default-settings/files/99-default-settings
 if [ $? != 0 ]; then
 	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
 	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
-		cat> /etc/rc.local<<-EOFF
+		cat << 'EOFF' > /etc/rc.local #用单引号 'EOFF' 来包裹文本内容，内容就不会被 shell 解释保持原样写入。
 		# Put your custom commands here that should be executed once
 		# the system init finished. By default this file does nothing.
 		if [ -f "/etc/xray_backup/xray_backup" ]; then
@@ -122,13 +122,13 @@ if [ $? != 0 ]; then
 		# chmod +x /usr/bin/xray
 		# Check if the copy operation was successful
 		  if [ $? -eq 0 ]; then
-			 touch /tmp/xray_succ.log
+		 touch /tmp/xray_succ.log
 		  fi
 		rm -rf  /etc/xray_backup/xray_backup
 		fi
 		exit 0
 		EOFF
-		exit 0
+	exit 0
 	EOF
 fi
 EOOF
