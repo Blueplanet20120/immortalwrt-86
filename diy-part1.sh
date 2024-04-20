@@ -113,7 +113,7 @@ fi
 grep "xray_backup"  package/emortal/default-settings/files/99-default-settings
 if [ $? != 0 ]; then
 	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
-	cat<< 'EOF' > package/emortal/default-settings/files/99-default-settings
+	cat<< 'EOF' >> package/emortal/default-settings/files/99-default-settings
 		cat<< 'EOFF' > /etc/rc.local
 		# Put your custom commands here that should be executed once
 		# the system init finished. By default this file does nothing.
