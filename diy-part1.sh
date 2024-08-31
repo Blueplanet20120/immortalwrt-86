@@ -25,6 +25,7 @@ touch wget/DISTRIB_REVISION1
 touch wget/DISTRIB_REVISION3
 touch files/usr/share/Check_Update.sh
 touch files/usr/share/Lenyu-auto.sh
+touch files/usr/share/Lenyu-pw.sh
 
 # backup config
 cat>> package/base-files/files/lib/upgrade/keep.d/base-files-essential<<-EOF
@@ -106,6 +107,15 @@ if [ $? != 0 ]; then
 	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
 	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
 	sed -i '$ a alias lenyu-auto="sh /usr/share/Lenyu-auto.sh"' /etc/profile
+	exit 0
+	EOF
+fi
+
+grep "Lenyu-pw.sh"  package/emortal/default-settings/files/99-default-settings
+if [ $? != 0 ]; then
+	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
+	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
+	sed -i '$ a alias lenyu-pw="sh /usr/share/Lenyu-pw.sh"' /etc/profile
 	exit 0
 	EOF
 fi
@@ -366,5 +376,49 @@ exit
 fi
 fi
 
+exit 0
+EOF
+
+cat>files/usr/share/Lenyu-pw.sh<<-\EOF
+#!/bin/sh
+# Ensure unzip is installed
+opkg update
+opkg install unzip
+
+# Define variables
+TEMP_DIR="/tmp/test"
+
+# Create temporary directory
+mkdir -p "$TEMP_DIR"
+
+# Get the latest release information
+latest_release=$(curl -s https://api.github.com/repos/xiaorouji/openwrt-passwall/releases/latest)
+
+# Extract version number
+version=$(echo "$latest_release" | grep '"tag_name":' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
+
+# Extract download URLs
+luci_app_passwall_url=$(echo "$latest_release" | grep -o '"browser_download_url": "[^"]*luci-23.05_luci-app-passwall_[^"]*"' | sed -E 's/.*"browser_download_url": "([^"]+)".*/\1/')
+luci_i18n_passwall_url=$(echo "$latest_release" | grep -o '"browser_download_url": "[^"]*luci-23.05_luci-i18n-passwall-zh-cn_[^"]*"' | sed -E 's/.*"browser_download_url": "([^"]+)".*/\1/')
+
+# Download files to temporary directory
+wget -O "$TEMP_DIR/luci-23.05_luci-app-passwall_${version}_all.ipk" "$luci_app_passwall_url"
+wget -O "$TEMP_DIR/luci-23.05_luci-i18n-passwall-zh-cn_${version}_all.ipk" "$luci_i18n_passwall_url"
+sleep 5
+echo "Download completed:"
+echo "$TEMP_DIR/luci-23.05_luci-app-passwall_${version}_all.ipk"
+echo "$TEMP_DIR/luci-23.05_luci-i18n-passwall-zh-cn_${version}_all.ipk"
+
+# Install downloaded IPK files
+opkg install "$TEMP_DIR/luci-23.05_luci-app-passwall_${version}_all.ipk"
+opkg install "$TEMP_DIR/luci-23.05_luci-i18n-passwall-zh-cn_${version}_all.ipk"
+
+# Restart passwall service
+/etc/init.d/passwall restart
+
+echo "Plugins installed and passwall service restarted."
+
+rm -rf $TEMP_DIR
+ 
 exit 0
 EOF
