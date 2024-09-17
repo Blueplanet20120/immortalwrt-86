@@ -121,6 +121,26 @@ if [ $? != 0 ]; then
 	EOF
 fi
 
+grep "backup"  package/lean/default-settings/files/zzz-default-settings
+if [ $? != 0 ]; then
+	sed -i 's/exit 0/ /'  package/lean/default-settings/files/zzz-default-settings
+	cat>> package/lean/default-settings/files/zzz-default-settings<<-EOF
+		cat> /etc/rc.local<<-EOFF
+		# Put your custom commands here that should be executed once
+		# the system init finished. By default this file does nothing.
+  		sleep 5
+    		# Restoring the ROM configuration file
+		sysupgrade -r /usr/share/backup.tar.gz
+		sleep 3
+		rm -rf /usr/share/backup.tar.gz
+		exit 0
+		EOFF
+	exit 0
+	EOF
+	fi
+
+EOOF
+
 cat>files/usr/share/Check_Update.sh<<-\EOF
 #!/bin/bash
 # https://github.com/Blueplanet20120/Actions-OpenWrt-x86
@@ -341,6 +361,9 @@ sleep 1
 exit
 fi
 gzip -d /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img.gz
+# Backing the ROM configuration file
+sysupgrade -b /usr/share/backup.tar.gz
+# 开始升级
 sysupgrade /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img
 else
 echo -e "\033[32m 本地已经是最新版本，还更个鸡巴毛啊… \033[0m"
@@ -348,7 +371,6 @@ echo
 exit
 fi
 fi
-
 exit 0
 EOF
 
