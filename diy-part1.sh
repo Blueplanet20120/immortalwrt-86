@@ -28,7 +28,7 @@ touch files/usr/share/Lenyu-auto.sh
 touch files/usr/share/Lenyu-pw.sh
 
 # backup config
-cat>> package/base-files/files/lib/upgrade/keep.d/base-files-essential<<-EOF
+cat>>/etc/sysupgrade.conf<<-EOF
 /etc/config/dhcp
 /etc/config/sing-box
 /etc/config/romupdate
@@ -43,6 +43,7 @@ cat>> package/base-files/files/lib/upgrade/keep.d/base-files-essential<<-EOF
 /usr/bin/chinadns-ng
 /usr/bin/sing-box
 /usr/bin/hysteria
+/usr/bin/xray
 EOF
 
 
