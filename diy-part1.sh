@@ -37,12 +37,12 @@ cat>> package/base-files/files/lib/upgrade/keep.d/base-files-essential<<-EOF
 /etc/config/passwall
 /usr/share/passwall/rules/
 /usr/share/singbox/
-/usr/share/v2ray/
+/usr/share/v2ray/geoip.dat
+/usr/share/v2ray/geoip.dat
 /etc/openclash/core/
 /usr/bin/chinadns-ng
 /usr/bin/sing-box
 /usr/bin/hysteria
-/usr/bin/xray
 EOF
 
 
