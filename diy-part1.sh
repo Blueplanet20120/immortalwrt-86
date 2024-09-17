@@ -121,10 +121,10 @@ if [ $? != 0 ]; then
 	EOF
 fi
 
-grep "backup"  package/lean/default-settings/files/zzz-default-settings
+grep "backup.tar.gz"  package/emortal/default-settings/files/99-default-settings
 if [ $? != 0 ]; then
-	sed -i 's/exit 0/ /'  package/lean/default-settings/files/zzz-default-settings
-	cat>> package/lean/default-settings/files/zzz-default-settings<<-EOF
+	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
+	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
 		cat> /etc/rc.local<<-EOFF
 		# Put your custom commands here that should be executed once
 		# the system init finished. By default this file does nothing.
@@ -361,8 +361,10 @@ sleep 1
 exit
 fi
 gzip -d /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img.gz
+
 # Backing the ROM configuration file
 sysupgrade -b /usr/share/backup.tar.gz
+
 # 开始升级
 sysupgrade /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img
 else
