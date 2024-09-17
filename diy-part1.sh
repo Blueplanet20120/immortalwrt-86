@@ -121,28 +121,6 @@ if [ $? != 0 ]; then
 	EOF
 fi
 
-grep "xray_backup"  package/emortal/default-settings/files/99-default-settings
-if [ $? != 0 ]; then
-	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
-	cat<< 'EOF' >> package/emortal/default-settings/files/99-default-settings
-		cat<< 'EOFF' > /etc/rc.local
-		# Put your custom commands here that should be executed once
-		# the system init finished. By default this file does nothing.
-		if [ -f "/etc/xray_backup/xray_backup" ]; then
-		cp -f /etc/xray_backup/xray_backup /usr/bin/xray
-		# chmod +x /usr/bin/xray
-		# Check if the copy operation was successful
-		  if [ $? -eq 0 ]; then
-		 touch /tmp/xray_succ.log
-		  fi
-		rm -rf  /etc/xray_backup/xray_backup
-		fi
-		exit 0 
-		EOFF
-	exit 0
-	EOF
-fi
-EOOF
 cat>files/usr/share/Check_Update.sh<<-\EOF
 #!/bin/bash
 # https://github.com/Blueplanet20120/Actions-OpenWrt-x86
@@ -304,12 +282,6 @@ echo
 exit 0
 fi
 rm -f /tmp/cloud_version
-
-# 备份backup-passwall中的xray文件
-if [ ! -d "/etc/xray_backup" ]; then
-    mkdir /etc/xray_backup
-fi
-cp -f /usr/bin/xray /etc/xray_backup/xray_backup
 
 # 获取固件云端版本号、内核版本号信息
 current_version=`cat /etc/lenyu_version`
