@@ -125,7 +125,7 @@ grep "backup.tar.gz"  package/emortal/default-settings/files/99-default-settings
 if [ $? != 0 ]; then
 	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
 	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
- 	echo "@reboot sleep 60 && /etc/rc.local" >> /etc/crontabs/root
+ 	echo "@reboot sleep 60 && bash /etc/rc.local" >> /etc/crontabs/root
 		cat> /etc/rc.local<<-EOFF
 		# Restoring the ROM configuration file
 		if [ -f /usr/share/backup.tar.gz ]; then
