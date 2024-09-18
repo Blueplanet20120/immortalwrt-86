@@ -352,6 +352,9 @@ if [ $? != 0 ]; then
   sleep 4
   exit
 fi
+# Backing the ROM configuration file
+sysupgrade -b /usr/share/backup.tar.gz
+# update rom
 gzip -d /tmp/immortalwrt_x86-64-${new_version}_sta_Lenyu.img.gz
 sysupgrade /tmp/immortalwrt_x86-64-${new_version}_sta_Lenyu.img
 else
@@ -369,12 +372,10 @@ echo "您下载文件失败，请检查网络重试…"
 sleep 1
 exit
 fi
-gzip -d /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img.gz
-
 # Backing the ROM configuration file
 sysupgrade -b /usr/share/backup.tar.gz
-
-# 开始升级
+# update rom
+gzip -d /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img.gz
 sysupgrade /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img
 else
 echo -e "\033[32m 本地已经是最新版本，还更个鸡巴毛啊… \033[0m"
