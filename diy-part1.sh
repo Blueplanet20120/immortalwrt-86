@@ -134,6 +134,7 @@ if [ $? != 0 ]; then
 			sleep 1
 			rm -rf /usr/share/backup.tar.gz
 			echo "Restore succeeded" > /tmp/restore_succ.log
+   			/etc/init.d/passwall restart #重启pw服务
 			exit 0
 		    else
 			echo "Restore failed" > /tmp/restore_fail.log
