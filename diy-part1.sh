@@ -128,12 +128,21 @@ if [ $? != 0 ]; then
 		cat> /etc/rc.local<<-EOFF
 		# Put your custom commands here that should be executed once
 		# the system init finished. By default this file does nothing.
-  		sleep 5
+  		sleep 3
     		# Restoring the ROM configuration file
-		sysupgrade -r /usr/share/backup.tar.gz
-		sleep 3
-		rm -rf /usr/share/backup.tar.gz
-		exit 0
+		if [ -f /usr/share/backup.tar.gz ]; then
+		    if sysupgrade -r /usr/share/backup.tar.gz; then
+			sleep 2
+			rm -rf /usr/share/backup.tar.gz
+			echo "Restore succeeded at $(date)" > /tmp/restore_succ.log
+			exit 0
+		    else
+			echo "Restore failed at $(date)" > /tmp/restore_fail.log
+			exit 1
+		    fi
+		else
+		    exit 1
+		fi
 		EOFF
 	exit 0
 	EOF
