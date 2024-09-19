@@ -125,33 +125,39 @@ grep "backup.tar.gz"  package/emortal/default-settings/files/99-default-settings
 if [ $? != 0 ]; then
 	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
 	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
- 	echo "@reboot sleep 60 && bash /etc/rc.local > /dev/null 2>&1 &" >> /etc/crontabs/root
-		cat> /etc/rc.local<<-EOFF
-		# Restoring the ROM configuration file
-		if [ -f /usr/share/backup.tar.gz ]; then
-		    echo "Backup file found, attempting to restore..." > /tmp/restore.log
-		    
-		    if sysupgrade -r /usr/share/backup.tar.gz; then
-		        sleep 1
-		        # rm -rf /usr/share/backup.tar.gz
-		        echo "Restore succeeded" >> /tmp/restore.log
-	  		# Restart Passwall service
-        		/etc/init.d/passwall restart
-		        exit 0
-		    else
-		        echo "Restore failed" >> /tmp/restore.log
-		        exit 1
-		    fi
-		else
-		    echo "Backup file not found" >> /tmp/restore.log
-		    exit 1
-		fi
-		
-		exit 0
-		EOFF
-	exit 0
-	EOF
+ 	# Check if /etc/crontabs/root contains rc.local
+	if ! grep -q "rc.local" /etc/crontabs/root; then
+		echo "@reboot sleep 60 && bash /etc/rc.local > /dev/null 2>&1 &" >> /etc/crontabs/root
+		echo "Add rc.local succeeded" >> /tmp/restore.log
+	else
+		echo "rc.local already exists Exit" >> /tmp/restore.log
 	fi
+	cat> /etc/rc.local<<-EOFF
+	# Restoring the ROM configuration file
+	if [ -f /usr/share/backup.tar.gz ]; then
+	    echo "Backup file found, attempting to restore..." > /tmp/restore.log
+	    
+	    if sysupgrade -r /usr/share/backup.tar.gz; then
+		sleep 1
+		# rm -rf /usr/share/backup.tar.gz
+		echo "Restore succeeded" >> /tmp/restore.log
+		# Restart Passwall service
+		/etc/init.d/passwall restart
+		exit 0
+	    else
+		echo "Restore failed" >> /tmp/restore.log
+		exit 1
+	    fi
+	else
+	    echo "Backup file not found" >> /tmp/restore.log
+	    exit 1
+	fi
+	
+	exit 0
+	EOFF
+exit 0
+EOF
+fi
 
 EOOF
 
