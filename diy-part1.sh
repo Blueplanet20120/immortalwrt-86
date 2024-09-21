@@ -567,7 +567,7 @@ fi
 rm -rf "$TEMP_RESTORE_DIR"
 
 # 清理备份文件
-# rm -rf "$BACKUP_FILE"
+rm -rf "$BACKUP_FILE"
 exit 0
 EOF
 
