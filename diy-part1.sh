@@ -121,13 +121,23 @@ grep "backup.tar.gz"  package/emortal/default-settings/files/99-default-settings
 if [ $? != 0 ]; then
 	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
 	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
-	# Check if /etc/crontabs/root contains rc.local
-	if ! grep -q "rc.local" /etc/crontabs/root; then
-		echo "@reboot sleep 60 && bash /etc/rc.local > /dev/null 2>&1 &" >> /etc/crontabs/root
-		echo "Add rc.local succeeded" >> /tmp/restore.log
+	######添加定时执行rc.local任务
+	# 检查 /etc/crontabs/root 中 rc.local 的出现次数
+	RC_COUNT=$(grep -c "rc.local" /etc/crontabs/root)
+	
+	# 删除多余的 rc.local 条目
+	if [ "$RC_COUNT" -gt 1 ]; then
+	    awk '/rc.local/ && !seen {print; seen=1; next} !/rc.local/' /etc/crontabs/root > tmpfile && mv tmpfile /etc/crontabs/root
+	    echo "Removed extra rc.local entries, kept one" >> /tmp/restore.log
+	elif [ "$RC_COUNT" -eq 0 ]; then
+	    # 如果没有 rc.local，添加一条
+	    echo "@reboot sleep 60 && bash /etc/rc.local > /dev/null 2>&1 &" >> /etc/crontabs/root
+	    echo "Add rc.local succeeded" >> /tmp/restore.log
 	else
-		echo "rc.local already exists Exit" >> /tmp/restore.log
+	    # 如果只存在一条
+	    echo "rc.local already exists, no action taken" >> /tmp/restore.log
 	fi
+	#####
 	cat> /etc/rc.local<<-EOFF
 	# Restoring the ROM configuration file
 	if [ -f /mnt/sdb1/custom-backup.tar.gz ]; then
