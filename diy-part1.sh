@@ -38,13 +38,9 @@ cat>>/etc/sysupgrade.conf<<-EOF
 #/etc/openclash/core/ #dev
 /usr/share/passwall/rules/
 /usr/share/singbox/
-/usr/share/v2ray/
-/usr/share/v2ray/geoip.dat
-/usr/share/v2ray/geosite.dat
 /usr/bin/chinadns-ng
 /usr/bin/sing-box
 /usr/bin/hysteria
-/usr/bin/xray
 EOF
 
 
@@ -125,7 +121,7 @@ grep "backup.tar.gz"  package/emortal/default-settings/files/99-default-settings
 if [ $? != 0 ]; then
 	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
 	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
- 	# Check if /etc/crontabs/root contains rc.local
+	# Check if /etc/crontabs/root contains rc.local
 	if ! grep -q "rc.local" /etc/crontabs/root; then
 		echo "@reboot sleep 60 && bash /etc/rc.local > /dev/null 2>&1 &" >> /etc/crontabs/root
 		echo "Add rc.local succeeded" >> /tmp/restore.log
@@ -134,29 +130,25 @@ if [ $? != 0 ]; then
 	fi
 	cat> /etc/rc.local<<-EOFF
 	# Restoring the ROM configuration file
-	if [ -f /usr/share/backup.tar.gz ]; then
-	    echo "Backup file found, attempting to restore..." > /tmp/restore.log
-	    
-	    if sysupgrade -r /usr/share/backup.tar.gz; then
-		sleep 1
-		# rm -rf /usr/share/backup.tar.gz
-		echo "Restore succeeded" >> /tmp/restore.log
+	if [ -f /mnt/sdb1/custom-backup.tar.gz ]; then
+	    	echo "Restore script already exists: /tmp/custom-backup.tar.gz"
+		echo "Performing Restore..."
+		bash /usr/share/custom-restore.sh
+		echo "Restore completed."
+		echo echo "Restore successful" > /tmp/restore.log
+		
 		# Restart Passwall service
 		/etc/init.d/passwall restart
 		exit 0
-	    else
+	else
 		echo "Restore failed" >> /tmp/restore.log
 		exit 1
-	    fi
-	else
-	    echo "Backup file not found" >> /tmp/restore.log
-	    exit 1
 	fi
 	
 	exit 0
 	EOFF
-exit 0
-EOF
+	exit 0
+	EOF
 fi
 
 EOOF
@@ -364,7 +356,7 @@ if [ $? != 0 ]; then
   exit
 fi
 # Backing the ROM configuration file
-sysupgrade -b /usr/share/backup.tar.gz
+bash /usr/share/custom-backup.sh
 # update rom
 gzip -d /tmp/immortalwrt_x86-64-${new_version}_sta_Lenyu.img.gz
 sysupgrade /tmp/immortalwrt_x86-64-${new_version}_sta_Lenyu.img
@@ -384,7 +376,7 @@ sleep 1
 exit
 fi
 # Backing the ROM configuration file
-sysupgrade -b /usr/share/backup.tar.gz
+bash /usr/share/custom-backup.sh
 # update rom
 gzip -d /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img.gz
 sysupgrade /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img
@@ -488,3 +480,84 @@ rm -rf $TEMP_DIR
 
 exit 0
 EOF
+
+cat> files/usr/share/custom-backup.sh<<-\EOF  
+#!/bin/sh
+
+BACKUP_DIR="/mnt/sdb1/custom-backup"
+BACKUP_FILE="/mnt/sdb1/custom-backup.tar.gz"
+
+# 判断 /mnt/sdb1/ 是否存在
+if [ -d "/mnt/sdb1/" ]; then
+    # 创建备份目录
+    mkdir -p $BACKUP_DIR
+
+    # 使用 tar 命令直接备份文件和目录，保留目录结构
+    tar -czvf $BACKUP_FILE \
+        /usr/bin/xray \
+        /usr/share/v2ray/geoip.dat \
+        /usr/share/v2ray/geosite.dat
+
+    # 检查备份是否成功
+    if [ $? -eq 0 ]; then
+        echo "Backup successful: $BACKUP_FILE"
+    else
+        echo "Backup failed"
+    fi
+
+    # 清理临时备份目录
+    rm -rf $BACKUP_DIR
+else
+    echo "/mnt/sdb1/ does not exist, backup canceled!"
+fi
+exit 0
+EOF
+
+cat>files/usr/share/custom-restore.sh<<-\EOF
+#!/bin/sh
+
+BACKUP_FILE="/mnt/sdb1/custom-backup.tar.gz"
+TEMP_RESTORE_DIR="/mnt/sdb1/restore-tmp"
+
+# 检查备份文件是否存在
+if [ ! -f "$BACKUP_FILE" ]; then
+    echo "Backup file not found: $BACKUP_FILE"
+    exit 1
+fi
+
+# 创建临时恢复目录
+mkdir -p "$TEMP_RESTORE_DIR"
+
+# 解压备份文件到临时恢复目录
+tar -xzvf "$BACKUP_FILE" -C "$TEMP_RESTORE_DIR"
+
+# 检查解压是否成功
+if [ $? -ne 0 ]; then
+    echo "Extraction failed"
+    rm -rf "$TEMP_RESTORE_DIR"
+    exit 1
+fi
+
+# 创建目标目录
+mkdir -p /usr/share/v2ray/
+
+# 复制文件到系统对应位置
+cp -r "$TEMP_RESTORE_DIR/usr/bin/xray" "/usr/bin/xray"
+cp -r "$TEMP_RESTORE_DIR/usr/share/v2ray/geoip.dat" "/usr/share/v2ray/geoip.dat"
+cp -r "$TEMP_RESTORE_DIR/usr/share/v2ray/geosite.dat" "/usr/share/v2ray/geosite.dat"
+
+# 检查复制是否成功
+if [ $? -eq 0 ]; then
+    echo "Restore successful"
+else
+    echo "Restore failed"
+fi
+
+# 清理临时恢复目录
+rm -rf "$TEMP_RESTORE_DIR"
+
+# 清理备份文件
+# rm -rf "$BACKUP_FILE"
+exit 0
+EOF
+
