@@ -120,7 +120,7 @@ fi
 grep "backup.tar.gz"  package/emortal/default-settings/files/99-default-settings
 if [ $? != 0 ]; then
 	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
-	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
+	cat>> package/emortal/default-settings/files/99-default-settings<<-\EOF
 	######添加定时执行rc.local任务
 	# 检查 /etc/crontabs/root 中 rc.local 的出现次数
 	RC_COUNT=$(grep -c "rc.local" /etc/crontabs/root)
@@ -138,27 +138,27 @@ if [ $? != 0 ]; then
 	    echo "rc.local already exists, no action taken" >> /tmp/restore.log
 	fi
 	#####
-	cat> /etc/rc.local<<-EOFF
+	cat> /etc/rc.local<<-\EOFF
 	# Restoring the ROM configuration file
 	if [ -f /mnt/sdb1/custom-backup.tar.gz ]; then
-	    	echo "Restore script already exists: /tmp/custom-backup.tar.gz"
+ 		echo "Restore script already exists: /tmp/custom-backup.tar.gz"
 		echo "Performing Restore..."
 		bash /usr/share/custom-restore.sh
 		echo "Restore completed."
-		echo echo "Restore successful" > /tmp/restore.log
+		echo "Restore successful $(date '+%Y-%m-%d %H:%M:%S')" >> /tmp/restore.log
 		
 		# Restart Passwall service
 		/etc/init.d/passwall restart
 		exit 0
 	else
-		echo "Restore failed" >> /tmp/restore.log
+		echo "Restore failed $(date '+%Y-%m-%d %H:%M:%S')" >> /tmp/restore.log
 		exit 1
 	fi
 	
 	exit 0
 	EOFF
-	exit 0
-	EOF
+exit 0
+EOF
 fi
 
 EOOF
