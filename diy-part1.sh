@@ -140,7 +140,23 @@ if [ $? != 0 ]; then
 	#####
 	cat> /etc/rc.local<<-\EOFF
 	# Restoring the ROM configuration file
-	if [ -f /mnt/sdb1/custom-backup.tar.gz ]; then
+ 	get_smallest_mounted_disk() {
+	    # 使用 lsblk 列出挂载在 /mnt/ 下的设备并过滤掉小于 100M 的设备
+	    lsblk -o NAME,SIZE,MOUNTPOINT | grep "/mnt/" | awk '$2 ~ /[0-9.]+[G]/ || ($2 ~ /[0-9.]+M/ && $2+0 > 100) {print $1, $2}' > /tmp/tmdisk
+	    # 计算最小的磁盘并将其路径存入 tmdisk 变量
+	    tmdisk=/mnt/$(grep "" /tmp/tmdisk | awk '
+	    $2 ~ /M/ {size = $2+0} 
+	    $2 ~ /G/ {size = $2*1024} 
+	    NR == 1 {min = size; line = $1} 
+	    NR > 1 && size < min {min = size; line = $1} 
+	    END {gsub(/[^a-zA-Z0-9]/, "", line); print line}')
+	
+	    # 输出结果
+	     echo "$tmdisk"
+	}
+	# 调用 get_smallest_mounted_disk 函数并将结果存储到变量 disk_path 中
+	disk_path=$(get_smallest_mounted_disk)
+	if [ -f ${disk_path}/custom-backup.tar.gz ]; then
  		echo "Restore script already exists: /tmp/custom-backup.tar.gz"
 		echo "Performing Restore..."
 		bash /usr/share/custom-restore.sh
@@ -493,41 +509,71 @@ EOF
 
 cat> files/usr/share/custom-backup.sh<<-\EOF  
 #!/bin/sh
+get_smallest_mounted_disk() {
+    # 使用 lsblk 列出挂载在 /mnt/ 下的设备并过滤掉小于 100M 的设备
+    lsblk -o NAME,SIZE,MOUNTPOINT | grep "/mnt/" | awk '$2 ~ /[0-9.]+[G]/ || ($2 ~ /[0-9.]+M/ && $2+0 > 100) {print $1, $2}' > /tmp/tmdisk
 
-BACKUP_DIR="/mnt/sdb1/custom-backup"
-BACKUP_FILE="/mnt/sdb1/custom-backup.tar.gz"
+    # 计算最小的磁盘并将其路径存入 tmdisk 变量
+    tmdisk=/mnt/$(grep "" /tmp/tmdisk | awk '
+    $2 ~ /M/ {size = $2+0} 
+    $2 ~ /G/ {size = $2*1024} 
+    NR == 1 {min = size; line = $1} 
+    NR > 1 && size < min {min = size; line = $1} 
+    END {gsub(/[^a-zA-Z0-9]/, "", line); print line}')
 
-# 判断 /mnt/sdb1/ 是否存在
-if [ -d "/mnt/sdb1/" ]; then
-    # 创建备份目录
-    mkdir -p $BACKUP_DIR
+    # 输出结果
+     echo "$tmdisk"
+}
+# 调用 get_smallest_mounted_disk 函数并将结果存储到变量 disk_path 中
+disk_path=$(get_smallest_mounted_disk)
 
-    # 使用 tar 命令直接备份文件和目录，保留目录结构
-    tar -czvf $BACKUP_FILE \
-        /usr/bin/xray \
-        /usr/share/v2ray/geoip.dat \
-        /usr/share/v2ray/geosite.dat
+BACKUP_DIR="${disk_path}/custom-backup"
+BACKUP_FILE="${disk_path}/custom-backup.tar.gz"
 
-    # 检查备份是否成功
-    if [ $? -eq 0 ]; then
-        echo "Backup successful: $BACKUP_FILE"
-    else
-        echo "Backup failed"
-    fi
+# 创建备份目录
+mkdir -p $BACKUP_DIR
 
-    # 清理临时备份目录
-    rm -rf $BACKUP_DIR
+# 使用 tar 命令直接备份文件和目录，保留目录结构
+tar -czvf $BACKUP_FILE \
+    /usr/bin/xray \
+    /usr/share/v2ray/geoip.dat \
+    /usr/share/v2ray/geosite.dat
+
+# 检查备份是否成功
+if [ $? -eq 0 ]; then
+    echo "Backup successful: $BACKUP_FILE"
 else
-    echo "/mnt/sdb1/ does not exist, backup canceled!"
+    echo "Backup failed"
 fi
+
+# 清理临时备份目录
+rm -rf $BACKUP_DIR
 exit 0
 EOF
 
 cat>files/usr/share/custom-restore.sh<<-\EOF
 #!/bin/sh
+get_smallest_mounted_disk() {
+    # 使用 lsblk 列出挂载在 /mnt/ 下的设备并过滤掉小于 100M 的设备
+    lsblk -o NAME,SIZE,MOUNTPOINT | grep "/mnt/" | awk '$2 ~ /[0-9.]+[G]/ || ($2 ~ /[0-9.]+M/ && $2+0 > 100) {print $1, $2}' > /tmp/tmdisk
 
-BACKUP_FILE="/mnt/sdb1/custom-backup.tar.gz"
-TEMP_RESTORE_DIR="/mnt/sdb1/restore-tmp"
+    # 计算最小的磁盘并将其路径存入 tmdisk 变量
+    tmdisk=/mnt/$(grep "" /tmp/tmdisk | awk '
+    $2 ~ /M/ {size = $2+0} 
+    $2 ~ /G/ {size = $2*1024} 
+    NR == 1 {min = size; line = $1} 
+    NR > 1 && size < min {min = size; line = $1} 
+    END {gsub(/[^a-zA-Z0-9]/, "", line); print line}')
+
+    # 输出结果
+     echo "$tmdisk"
+}
+# 调用 get_smallest_mounted_disk 函数并将结果存储到变量 disk_path 中
+disk_path=$(get_smallest_mounted_disk)
+
+# 构建 BACKUP_FILE 路径并输出
+BACKUP_FILE="${disk_path}/custom-backup.tar.gz"
+TEMP_RESTORE_DIR="${disk_path}/restore-tmp"
 
 # 检查备份文件是否存在
 if [ ! -f "$BACKUP_FILE" ]; then
