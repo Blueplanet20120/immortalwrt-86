@@ -537,6 +537,7 @@ mkdir -p $BACKUP_DIR
 tar -czvf $BACKUP_FILE \
     /usr/bin/xray \
     /usr/share/v2ray/geoip.dat \
+    /usr/share/passwall/rules \
     /usr/share/v2ray/geosite.dat
 
 # 检查备份是否成功
