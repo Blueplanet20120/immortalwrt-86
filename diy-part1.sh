@@ -268,11 +268,9 @@ case $num1 in
 	echo
 	sleep 3
 	if [ ! -d /sys/firmware/efi ];then
-		gzip -d immortalwrt_x86-64-${new_version}_sta_Lenyu.img.gz
-		sysupgrade /tmp/immortalwrt_x86-64-${new_version}_sta_Lenyu.img
+		sysupgrade /tmp/immortalwrt_x86-64-${new_version}_sta_Lenyu.img.gz
 	else
-		gzip -d immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img.gz
-		sysupgrade /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img
+		sysupgrade /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img.gz
 	fi
     ;;
     n|N)
@@ -281,11 +279,9 @@ case $num1 in
     echo
     sleep 3
 	if [ ! -d /sys/firmware/efi ];then
-		gzip -d immortalwrt_x86-64-${new_version}_sta_Lenyu.img.gz
-		sysupgrade -n  /tmp/immortalwrt_x86-64-${new_version}_sta_Lenyu.img
+		sysupgrade -n  /tmp/immortalwrt_x86-64-${new_version}_sta_Lenyu.img.gz
 	else
-		gzip -d immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img.gz
-		sysupgrade -n  /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img
+		sysupgrade -n  /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img.gz
 	fi
     ;;
     *)
@@ -384,8 +380,7 @@ fi
 # Backing the ROM configuration file
 bash /usr/share/custom-backup.sh
 # update rom
-gzip -d /tmp/immortalwrt_x86-64-${new_version}_sta_Lenyu.img.gz
-sysupgrade /tmp/immortalwrt_x86-64-${new_version}_sta_Lenyu.img
+sysupgrade /tmp/immortalwrt_x86-64-${new_version}_sta_Lenyu.img.gz
 else
 echo -e "\033[32m 本地已经是最新版本，还更个鸡巴毛啊… \033[0m"
 echo
@@ -404,8 +399,7 @@ fi
 # Backing the ROM configuration file
 bash /usr/share/custom-backup.sh
 # update rom
-gzip -d /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img.gz
-sysupgrade /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img
+sysupgrade /tmp/immortalwrt_x86-64-${new_version}_uefi-gpt_sta_Lenyu.img.gz
 else
 echo -e "\033[32m 本地已经是最新版本，还更个鸡巴毛啊… \033[0m"
 echo
