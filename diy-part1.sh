@@ -53,6 +53,7 @@ rm -rf  bin/targets/x86/64/immortalwrt-x86-64-generic-squashfs-rootfs.img.gz
 rm -rf  bin/targets/x86/64/immortalwrt-x86-64-generic-rootfs.tar.gz
 rm -rf  bin/targets/x86/64/immortalwrt-x86-64-generic.manifest
 rm -rf bin/targets/x86/64/sha256sums
+rm -rf bin/targets/x86/64/profiles.json
 rm -rf  bin/targets/x86/64/version.buildinfo
 rm -rf bin/targets/x86/64/immortalwrt-x86-64-generic-ext4-rootfs.img.gz
 rm -rf bin/targets/x86/64/immortalwrt-x86-64-generic-ext4-combined-efi.img.gz
@@ -62,6 +63,7 @@ rename_version=`cat files/etc/lenyu_version`
 str1=`grep "KERNEL_PATCHVER:="  target/linux/x86/Makefile | cut -d = -f 2` #判断当前默认内核版本号如5.10
 ver54=`grep "LINUX_VERSION-5.4 ="  include/kernel-5.4 | cut -d . -f 3`
 ver515=`grep "LINUX_VERSION-5.15 ="  include/kernel-5.15 | cut -d . -f 3`
+ver66=`grep "LINUX_VERSION-6.6 ="  include/kernel-6.6 | cut -d . -f 3`
 sleep 2
 if [ "$str1" = "5.4" ];then
   mv  bin/targets/x86/64/immortalwrt-x86-64-generic-squashfs-combined.img.gz       bin/targets/x86/64/immortalwrt_x86-64-${rename_version}_${str1}.${ver54}_sta_Lenyu.img.gz
@@ -69,6 +71,9 @@ if [ "$str1" = "5.4" ];then
 elif [ "$str1" = "5.15" ];then
   mv  bin/targets/x86/64/immortalwrt-x86-64-generic-squashfs-combined.img.gz       bin/targets/x86/64/immortalwrt_x86-64-${rename_version}_${str1}.${ver515}_sta_Lenyu.img.gz
   mv  bin/targets/x86/64/immortalwrt-x86-64-generic-squashfs-combined-efi.img.gz   bin/targets/x86/64/immortalwrt_x86-64-${rename_version}_${str1}.${ver515}_uefi-gpt_sta_Lenyu.img.gz
+elif [ "$str1" = "6.6" ];then
+  mv  bin/targets/x86/64/immortalwrt-x86-64-generic-squashfs-combined.img.gz       bin/targets/x86/64/immortalwrt_x86-64-${rename_version}_${str1}.${ver66}_sta_Lenyu.img.gz
+  mv  bin/targets/x86/64/immortalwrt-x86-64-generic-squashfs-combined-efi.img.gz   bin/targets/x86/64/immortalwrt_x86-64-${rename_version}_${str1}.${ver66}_uefi-gpt_sta_Lenyu.img.gz
 fi
 ls bin/targets/x86/64 | grep "gpt_sta_Lenyu.img" | cut -d - -f 3 | cut -d _ -f 1-2 > wget/op_version1
 #md5
