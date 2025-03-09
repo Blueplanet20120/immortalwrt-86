@@ -25,7 +25,7 @@ jobs:
     - name: Get Commit Hash
       id: getHash
       run: |
-        git clone  -b openwrt-24.10 https://github.com/immortalwrt/immortalwrt immortalwrt --filter=blob:none
+        git clone  -b openwrt-23.05 https://github.com/immortalwrt/immortalwrt immortalwrt --filter=blob:none
         cd immortalwrt
         echo "SHA_01=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         cd
