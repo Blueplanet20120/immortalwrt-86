@@ -129,6 +129,7 @@ CONFIG_PACKAGE_parted=y
 CONFIG_PACKAGE_protobuf=y
 CONFIG_PACKAGE_protobuf-lite=y
 CONFIG_PACKAGE_resolveip=y
+CONFIG_PACKAGE_romupdate2=y
 CONFIG_PACKAGE_ruby=y
 CONFIG_PACKAGE_ruby-bigdecimal=y
 CONFIG_PACKAGE_ruby-date=y
