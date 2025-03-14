@@ -475,7 +475,7 @@ latest_release=$(curl -s https://api.github.com/repos/xiaorouji/openwrt-passwall
 
 # Extract version number from GitHub release (例如 "25.3.9-1")
 version=$(echo "$latest_release" | grep '"tag_name":' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
-echo_blue "最新 GitHub 版本号：$version"
+
 
 # Extract download URLs
 luci_app_passwall_url=$(echo "$latest_release" | grep -o '"browser_download_url": "[^"]*luci-24.10_luci-app-passwall_[^"]*"' | sed -E 's/.*"browser_download_url": "([^"]+)".*/\1/')
@@ -487,11 +487,12 @@ i18n_file=$(basename "$luci_i18n_passwall_url")
 
 # 从 app_file 中提取版本号部分，即 "25.3.9-r1"
 version2410=$(echo "$app_file" | sed -E 's/^luci-24\.10_luci-app-passwall_([^_]+)_all\.ipk$/\1/')
-echo_blue "luci-24.10 插件版本：$version2410"
+echo_blue "最新云端版本号：$version2410"
 
 # 将当前安装的版本写入 psversion 文件
 opkg list-installed | grep luci-app-passwall | awk '{print $3}' > "$PSVERSION_FILE"
 installed_version=$(cat "$PSVERSION_FILE" 2>/dev/null)
+echo_blue "最新本地版本号：$installed_version"
 
 # 检查版本是否已经是最新的，比较时使用 version2410 变量
 if [ "$installed_version" = "$version2410" ]; then
@@ -521,8 +522,10 @@ echo "$TEMP_DIR/$app_file"
 echo "$TEMP_DIR/$i18n_file"
 
 # 安装下载的 IPK 包
-opkg install "$TEMP_DIR/$app_file"
-opkg install "$TEMP_DIR/$i18n_file"
+sleep 1
+/etc/init.d/passwall stop
+opkg install "$TEMP_DIR/$app_file" --force-overwrite
+opkg install "$TEMP_DIR/$i18n_file" --force-overwrite
 
 # 重启 passwall 服务
 /etc/init.d/passwall restart
