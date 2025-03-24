@@ -223,6 +223,7 @@ jobs:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
+        prerelease: true
 
     - name: Delete workflow runs
       uses: Blueplanet20120/delete-workflow-runs@main
