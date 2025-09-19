@@ -435,130 +435,124 @@ EOF
 
 cat>files/usr/share/Lenyu-pw.sh<<-\EOF
 #!/bin/sh
-# Define variables
+set -u
+set -o pipefail
+
 TEMP_DIR="/tmp/test"
 PSVERSION_FILE="/usr/share/psversion"
-UNZIP_URL="https://downloads.openwrt.org/releases/packages-23.05/x86_64/packages/unzip_6.0-8_x86_64.ipk"
-UNZIP_PACKAGE="unzip_6.0-8_x86_64.ipk"
-RED='\033[0;31m'    # Red color
-BLUE='\033[0;34m'   # Blue color
-ORANGE='\033[0;33m' # Orange color
-NC='\033[0m'        # No Color (reset)
+RED='\033[0;31m'; BLUE='\033[0;34m'; ORANGE='\033[0;33m'; NC='\033[0m'
 
-# Echo message in red color
-echo_red() {
-  echo -e "${RED}$1${NC}"
-}
+echo_red(){ echo -e "${RED}$1${NC}"; }
+echo_blue(){ echo -e "${BLUE}$1${NC}"; }
+echo_orange(){ echo -e "${ORANGE}$1${NC}"; }
 
-# Echo message in blue color
-echo_blue() {
-  echo -e "${BLUE}$1${NC}"
-}
-
-# Echo message in orange color
-echo_orange() {
-  echo -e "${ORANGE}$1${NC}"
-}
-
-# Preparing for update (blue message)
 echo_blue "正在做更新前的准备工作..."
-# 检查 unzip 是否已安装
-if opkg list-installed | grep -q unzip; then
-    echo "unzip 已经安装，跳过安装步骤。"
-else
-    # 下载 unzip 包
-    echo "开始下载 unzip 包..."
-    wget -q --show-progress "$UNZIP_URL" -O "$UNZIP_PACKAGE"
 
-    # 检查下载是否成功
-    if [ $? -eq 0 ]; then
-        echo "下载成功，开始安装 unzip 包..."
-        opkg install "$UNZIP_PACKAGE"
-        
-        # 检查安装是否成功
-        if [ $? -eq 0 ]; then
-            echo "unzip 安装成功！"
-        else
-            echo "unzip 安装失败！"
-        fi
-    else
-        echo "unzip 下载失败！"
-    fi
+# 1) unzip 更稳：先走本地源，失败才回落到固定 URL
+ensure_unzip() {
+  if opkg list-installed | grep -q '^unzip '; then
+    echo "unzip 已经安装，跳过安装步骤。"
+    return 0
+  fi
+  opkg update >/dev/null 2>&1 || true
+  if opkg install unzip >/dev/null 2>&1; then
+    echo "unzip 安装成功！"
+    return 0
+  fi
+  # 回退直连（与旧脚本一致的备用包）
+  URL="https://downloads.openwrt.org/releases/packages-23.05/x86_64/packages/unzip_6.0-8_x86_64.ipk"
+  PKG="/tmp/unzip_6.0-8_x86_64.ipk"
+  echo "本地源安装失败，尝试直连下载 unzip..."
+  wget -q --show-progress "$URL" -O "$PKG" && opkg install "$PKG" >/dev/null 2>&1 && echo "unzip 安装成功！" || echo_red "unzip 安装失败（可忽略，脚本无需 unzip）。"
+}
+ensure_unzip
+
+# 2) 预创建可能被上游脚本访问的路径，静默 find 报错 & conffile 校验告警
+mkdir -p /tmp/etc/passwall 2>/dev/null || true
+if [ -d /www/luci-static/resources ] && [ ! -e /www/luci-static/resources/qrcode.min.js ]; then
+  :> /www/luci-static/resources/qrcode.min.js
 fi
 
-# Create temporary directory
-mkdir -p "$TEMP_DIR"
+# 3) 记录已安装的常见后端，以便升级后按需补装
+BACKENDS="sing-box xray-core v2ray-plugin haproxy ipt2socks geoview"
+SAVED_BACKENDS=""
+for p in $BACKENDS; do
+  if opkg list-installed | awk '{print $1}' | grep -qx "$p"; then
+    SAVED_BACKENDS="$SAVED_BACKENDS $p"
+  fi
+done
 
-# Get the latest release information from GitHub
-latest_release=$(curl -s https://api.github.com/repos/xiaorouji/openwrt-passwall/releases/latest)
+# 4) 获取 GitHub 最新版本与下载链接（curl 不在则用 wget）
+fetch_latest_json() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -s https://api.github.com/repos/xiaorouji/openwrt-passwall/releases/latest
+  else
+    wget -qO- https://api.github.com/repos/xiaorouji/openwrt-passwall/releases/latest
+  fi
+}
+latest_release="$(fetch_latest_json)"
 
-# Extract version number from GitHub release (例如 "25.3.9-1")
-version=$(echo "$latest_release" | grep '"tag_name":' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
-
-
-# Extract download URLs
+# 解析 tag 与 24.10 适配的包链接
+version_tag=$(echo "$latest_release" | grep '"tag_name":' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
 luci_app_passwall_url=$(echo "$latest_release" | grep -o '"browser_download_url": "[^"]*luci-24.10_luci-app-passwall_[^"]*"' | sed -E 's/.*"browser_download_url": "([^"]+)".*/\1/')
 luci_i18n_passwall_url=$(echo "$latest_release" | grep -o '"browser_download_url": "[^"]*luci-24.10_luci-i18n-passwall-zh-cn_[^"]*"' | sed -E 's/.*"browser_download_url": "([^"]+)".*/\1/')
 
-# 获取文件名（例如 luci-24.10_luci-app-passwall_25.3.9-r1_all.ipk）
 app_file=$(basename "$luci_app_passwall_url")
 i18n_file=$(basename "$luci_i18n_passwall_url")
-
-# 从 app_file 中提取版本号部分，即 "25.3.9-r1"
 version2410=$(echo "$app_file" | sed -E 's/^luci-24\.10_luci-app-passwall_([^_]+)_all\.ipk$/\1/')
+
+if [ -z "${version2410:-}" ] || [ -z "${luci_app_passwall_url:-}" ] || [ -z "${luci_i18n_passwall_url:-}" ]; then
+  echo_red "没有在最新发布中找到 24.10 适配的 luci-app-passwall / i18n 包，退出。"
+  exit 1
+fi
+
 echo_blue "最新云端版本号：$version2410"
 
-# 将当前安装的版本写入 psversion 文件
-opkg list-installed | grep luci-app-passwall | awk '{print $3}' > "$PSVERSION_FILE"
-installed_version=$(cat "$PSVERSION_FILE" 2>/dev/null)
+# 5) 读取本地已装版本
+opkg list-installed | grep '^luci-app-passwall ' | awk '{print $3}' > "$PSVERSION_FILE" 2>/dev/null || true
+installed_version="$(cat "$PSVERSION_FILE" 2>/dev/null || echo '')"
 echo_blue "最新本地版本号：$installed_version"
 
-# 检查版本是否已经是最新的，比较时使用 version2410 变量
-if [ "$installed_version" = "$version2410" ]; then
+if [ "$installed_version" = "$version2410" ] && [ -n "$installed_version" ]; then
   echo_red "已经是最新版本，还更新个鸡毛啊！"
   exit 0
 fi
 
-# 如果版本不一致，提示用户确认（10秒倒计时，默认 y）
+# 6) 确认
 echo_orange "你即将更新 passwall 为最新版本：$version2410，确定更新吗？(y/n, 回车默认y，10秒后自动执行y)"
-read -t 10 -r confirmation
+read -t 10 -r confirmation || true
 confirmation=${confirmation:-y}
+[ "$confirmation" = "y" ] || { echo_blue "已取消更新。"; exit 0; }
 
-if [ "$confirmation" != "y" ]; then
-  echo_blue "已取消更新。"
-  exit 0
-fi
-
-# 用户确认后继续更新
 echo_blue "新版本可用，开始更新..."
+mkdir -p "$TEMP_DIR"
 
-# 下载文件到临时目录（保持原文件名）
-wget -O "$TEMP_DIR/$app_file" "$luci_app_passwall_url"
-wget -O "$TEMP_DIR/$i18n_file" "$luci_i18n_passwall_url"
-sleep 5
+# 7) 下载
+wget -O "$TEMP_DIR/$app_file" "$luci_app_passwall_url" || { echo_red "下载 $app_file 失败"; exit 1; }
+wget -O "$TEMP_DIR/$i18n_file" "$luci_i18n_passwall_url" || { echo_red "下载 $i18n_file 失败"; exit 1; }
 echo "下载完成:"
 echo "$TEMP_DIR/$app_file"
 echo "$TEMP_DIR/$i18n_file"
 
-# 安装下载的 IPK 包
-sleep 1
-/etc/init.d/passwall stop
+# 8) 停服务→安装→重启
+[ -x /etc/init.d/passwall ] && /etc/init.d/passwall stop || true
 opkg install "$TEMP_DIR/$app_file" --force-overwrite
 opkg install "$TEMP_DIR/$i18n_file" --force-overwrite
 
-# 重启 passwall 服务
-/etc/init.d/passwall restart
+# 9) 按需回装先前存在的后端
+for p in $SAVED_BACKENDS; do
+  if ! opkg list-installed | awk '{print $1}' | grep -qx "$p"; then
+    echo_blue "恢复安装后端：$p"
+    opkg install "$p" || echo_orange "注意：$p 安装失败（仓库可能无此包或架构不匹配），如需请手动安装。"
+  fi
+done
 
-# 将新版本号（version2410）写入 psversion 文件
+[ -x /etc/init.d/passwall ] && /etc/init.d/passwall restart || true
 echo "$version2410" > "$PSVERSION_FILE"
 
 echo_blue "插件已安装并且 passwall 服务已重启。"
-
-# 清理临时目录
 rm -rf "$TEMP_DIR"
-
 exit 0
-
 EOF
 
 cat> files/usr/share/custom-backup.sh<<-\EOF  
