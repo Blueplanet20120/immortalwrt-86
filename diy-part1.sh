@@ -1,3 +1,4 @@
+
 #!/bin/bash
 #
 # Copyright (c) 2019-2020 P3TERX <https://p3terx.com>
@@ -438,52 +439,42 @@ cat>files/usr/share/Lenyu-pw.sh<<-\EOF
 set -u
 set -o pipefail
 
-TEMP_DIR="/tmp/passwall_update"
-RULE_DIR="/usr/share/passwall/rules"
-RULE_BACKUP="/tmp/passwall_rule_backup"
+TEMP_DIR="/tmp/test"
 PSVERSION_FILE="/usr/share/psversion"
-UNZIP_URL="https://downloads.openwrt.org/releases/packages-23.05/x86_64/packages/unzip_6.0-8_x86_64.ipk"
-UNZIP_PACKAGE="/tmp/unzip_6.0-8_x86_64.ipk"
-
 RED='\033[0;31m'; BLUE='\033[0;34m'; ORANGE='\033[0;33m'; NC='\033[0m'
+
 echo_red(){ echo -e "${RED}$1${NC}"; }
 echo_blue(){ echo -e "${BLUE}$1${NC}"; }
 echo_orange(){ echo -e "${ORANGE}$1${NC}"; }
 
-echo_blue "== Passwall 更新脚本 =="
 echo_blue "正在做更新前的准备工作..."
 
-########################################
-# 0. 检查并安装 unzip（如果需要）
-########################################
-if opkg list-installed | awk '{print $1}' | grep -qx "unzip"; then
-  echo_blue "unzip 已经安装，跳过安装步骤。"
-else
-  echo_orange "检测到系统未安装 unzip，开始下载..."
-  wget -q --show-progress "$UNZIP_URL" -O "$UNZIP_PACKAGE"
-  
-  if [ $? -eq 0 ]; then
-    echo_blue "下载成功，开始安装 unzip 包..."
-    opkg install "$UNZIP_PACKAGE"
-    
-    if [ $? -eq 0 ]; then
-      echo_blue "unzip 安装成功！"
-      rm -f "$UNZIP_PACKAGE"
-    else
-      echo_red "unzip 安装失败！"
-      rm -f "$UNZIP_PACKAGE"
-      exit 1
-    fi
-  else
-    echo_red "unzip 下载失败！"
-    exit 1
+# 1) unzip 更稳：先走本地源，失败才回落到固定 URL
+ensure_unzip() {
+  if opkg list-installed | grep -q '^unzip '; then
+    echo "unzip 已经安装，跳过安装步骤。"
+    return 0
   fi
+  opkg update >/dev/null 2>&1 || true
+  if opkg install unzip >/dev/null 2>&1; then
+    echo "unzip 安装成功！"
+    return 0
+  fi
+  # 回退直连（与旧脚本一致的备用包）
+  URL="https://downloads.openwrt.org/releases/packages-23.05/x86_64/packages/unzip_6.0-8_x86_64.ipk"
+  PKG="/tmp/unzip_6.0-8_x86_64.ipk"
+  echo "本地源安装失败，尝试直连下载 unzip..."
+  wget -q --show-progress "$URL" -O "$PKG" && opkg install "$PKG" >/dev/null 2>&1 && echo "unzip 安装成功！" || echo_red "unzip 安装失败（可忽略，脚本无需 unzip）。"
+}
+ensure_unzip
+
+# 2) 预创建可能被上游脚本访问的路径，静默 find 报错 & conffile 校验告警
+mkdir -p /tmp/etc/passwall 2>/dev/null || true
+if [ -d /www/luci-static/resources ] && [ ! -e /www/luci-static/resources/qrcode.min.js ]; then
+  :> /www/luci-static/resources/qrcode.min.js
 fi
 
-########################################
-# 1. 记录已安装的后端
-########################################
-echo_blue "正在检测已安装的后端组件..."
+# 3) 记录已安装的常见后端，以便升级后按需补装
 BACKENDS="sing-box xray-core v2ray-plugin haproxy ipt2socks geoview"
 SAVED_BACKENDS=""
 for p in $BACKENDS; do
@@ -492,134 +483,186 @@ for p in $BACKENDS; do
   fi
 done
 
-########################################
-# 2. 获取 GitHub 最新 release
-########################################
-echo_blue "正在获取最新版本信息..."
+# 4) 获取 GitHub 最新版本与下载链接（curl 不在则用 wget）
 fetch_latest_json() {
-  command -v curl >/dev/null 2>&1 && curl -s https://api.github.com/repos/xiaorouji/openwrt-passwall/releases/latest \
-    || wget -qO- https://api.github.com/repos/xiaorouji/openwrt-passwall/releases/latest
+  if command -v curl >/dev/null 2>&1; then
+    curl -s https://api.github.com/repos/xiaorouji/openwrt-passwall/releases/latest
+  else
+    wget -qO- https://api.github.com/repos/xiaorouji/openwrt-passwall/releases/latest
+  fi
 }
 latest_release="$(fetch_latest_json)"
 
-luci_app_passwall_url=$(echo "$latest_release" \
-  | grep -o '"browser_download_url": "[^"]*luci-app-passwall_[^"]*all\.ipk"' \
-  | sed -E 's/.*"browser_download_url": "([^"]+)".*/\1/')
-luci_i18n_passwall_url=$(echo "$latest_release" \
-  | grep -o '"browser_download_url": "[^"]*luci-i18n-passwall-zh-cn_[^"]*all\.ipk"' \
-  | sed -E 's/.*"browser_download_url": "([^"]+)".*/\1/')
+# 解析 tag 与 24.10 适配的包链接
+version_tag=$(echo "$latest_release" | grep '"tag_name":' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
+luci_app_passwall_url=$(echo "$latest_release" | grep -o '"browser_download_url": "[^"]*luci-24.10_luci-app-passwall_[^"]*"' | sed -E 's/.*"browser_download_url": "([^"]+)".*/\1/')
+luci_i18n_passwall_url=$(echo "$latest_release" | grep -o '"browser_download_url": "[^"]*luci-24.10_luci-i18n-passwall-zh-cn_[^"]*"' | sed -E 's/.*"browser_download_url": "([^"]+)".*/\1/')
 
 app_file=$(basename "$luci_app_passwall_url")
 i18n_file=$(basename "$luci_i18n_passwall_url")
-version_new=$(echo "$app_file" | sed -E 's/^luci-app-passwall_([^_]+)_all\.ipk$/\1/')
+version2410=$(echo "$app_file" | sed -E 's/^luci-24\.10_luci-app-passwall_([^_]+)_all\.ipk$/\1/')
 
-[ -z "$version_new" ] && echo_red "未找到 Passwall 主程序，退出。" && exit 1
+if [ -z "${version2410:-}" ] || [ -z "${luci_app_passwall_url:-}" ] || [ -z "${luci_i18n_passwall_url:-}" ]; then
+  echo_red "没有在最新发布中找到 24.10 适配的 luci-app-passwall / i18n 包，退出。"
+  exit 1
+fi
 
-echo_blue "最新版本：$version_new"
+echo_blue "最新云端版本号：$version2410"
 
-########################################
-# 3. 本地版本检查
-########################################
-installed_version="$(opkg list-installed | grep '^luci-app-passwall ' | awk '{print $3}')"
-installed_version="${installed_version:-无}"
+# 5) 读取本地已装版本
+opkg list-installed | grep '^luci-app-passwall ' | awk '{print $3}' > "$PSVERSION_FILE" 2>/dev/null || true
+installed_version="$(cat "$PSVERSION_FILE" 2>/dev/null || echo '')"
+echo_blue "最新本地版本号：$installed_version"
 
-echo_blue "当前本地版本：$installed_version"
-
-if [ "$installed_version" = "$version_new" ]; then
-  echo_blue "已经是最新版本，无需更新。"
+if [ "$installed_version" = "$version2410" ] && [ -n "$installed_version" ]; then
+  echo_red "已经是最新版本，还更新个鸡毛啊！"
   exit 0
 fi
 
-########################################
-# 4. 用户确认
-########################################
-echo_orange "即将更新到版本 $version_new，继续？(y/n, 默认 y)"
-read -t 10 -r reply || true
-reply=${reply:-y}
-[ "$reply" = "y" ] || exit 0
+# 6) 确认
+echo_orange "你即将更新 passwall 为最新版本：$version2410，确定更新吗？(y/n, 回车默认y，10秒后自动执行y)"
+read -t 10 -r confirmation || true
+confirmation=${confirmation:-y}
+[ "$confirmation" = "y" ] || { echo_blue "已取消更新。"; exit 0; }
 
-########################################
-# 5. 下载新版本
-########################################
+echo_blue "新版本可用，开始更新..."
 mkdir -p "$TEMP_DIR"
-echo_blue "开始下载新版本..."
 
-wget -O "$TEMP_DIR/$app_file" "$luci_app_passwall_url" || { echo_red "主程序下载失败"; exit 1; }
-wget -O "$TEMP_DIR/$i18n_file" "$luci_i18n_passwall_url" || { echo_red "中文包下载失败"; exit 1; }
+# 7) 下载
+wget -O "$TEMP_DIR/$app_file" "$luci_app_passwall_url" || { echo_red "下载 $app_file 失败"; exit 1; }
+wget -O "$TEMP_DIR/$i18n_file" "$luci_i18n_passwall_url" || { echo_red "下载 $i18n_file 失败"; exit 1; }
+echo "下载完成:"
+echo "$TEMP_DIR/$app_file"
+echo "$TEMP_DIR/$i18n_file"
 
-########################################
-# 6. 安装前隐藏自定义规则（安静模式核心）
-########################################
-echo_blue "临时隐藏你的自定义规则（避免 opkg 提示）..."
-
-mkdir -p "$RULE_BACKUP"
-for f in direct_host direct_ip proxy_host; do
-  [ -f "$RULE_DIR/$f" ] && mv "$RULE_DIR/$f" "$RULE_BACKUP/$f" 2>/dev/null || true
-done
-
-########################################
-# 7. 停止 Passwall
-########################################
-echo_blue "正在停止 Passwall 服务..."
+# 8) 停服务→安装→重启
 [ -x /etc/init.d/passwall ] && /etc/init.d/passwall stop || true
-sleep 1
+opkg install "$TEMP_DIR/$app_file" --force-overwrite
+opkg install "$TEMP_DIR/$i18n_file" --force-overwrite
 
-########################################
-# 8. 清理 nft 表（修复升级报错）
-########################################
-echo_blue "清理 Passwall 旧 nftset..."
-
-nft flush ruleset 2>/dev/null || true
-for table in passwall passwall_chn passwall_geo passwall1; do
-  nft delete table inet "$table" 2>/dev/null || true
-done
-
-########################################
-# 9. 安装 Passwall（不会提示 conffile）
-########################################
-echo_blue "安装新版本..."
-
-opkg install "$TEMP_DIR/$app_file" --force-overwrite --force-reinstall
-opkg install "$TEMP_DIR/$i18n_file" --force-overwrite --force-reinstall
-
-########################################
-# 10. 恢复你的自定义规则（安静模式核心）
-########################################
-echo_blue "恢复你的自定义规则..."
-
-for f in direct_host direct_ip proxy_host; do
-  [ -f "$RULE_BACKUP/$f" ] && mv "$RULE_BACKUP/$f" "$RULE_DIR/$f" 2>/dev/null || true
-done
-
-########################################
-# 11. 恢复后端组件
-########################################
-echo_blue "恢复后端组件..."
-
+# 9) 按需回装先前存在的后端
 for p in $SAVED_BACKENDS; do
   if ! opkg list-installed | awk '{print $1}' | grep -qx "$p"; then
-    echo_orange "重新安装后端：$p"
-    opkg install "$p" --force-overwrite
+    echo_blue "恢复安装后端：$p"
+    opkg install "$p" || echo_orange "注意：$p 安装失败（仓库可能无此包或架构不匹配），如需请手动安装。"
   fi
 done
 
-########################################
-# 12. 初始化 nft 环境（避免 netlink 报错）
-########################################
-echo_blue "初始化 nft 环境..."
-sleep 1
-nft flush ruleset 2>/dev/null || true
+[ -x /etc/init.d/passwall ] && /etc/init.d/passwall restart || true
+echo "$version2410" > "$PSVERSION_FILE"
 
-########################################
-# 13. 重启 Passwall
-########################################
-echo_blue "重启 Passwall..."
-/etc/init.d/passwall restart || true
-
-echo "$version_new" > "$PSVERSION_FILE"
-echo_blue "=== Passwall 更新完成（安静模式，无提示）=== "
-
-rm -rf "$TEMP_DIR" "$RULE_BACKUP"
+echo_blue "插件已安装并且 passwall 服务已重启。"
+rm -rf "$TEMP_DIR"
 exit 0
 EOF
 
+cat> files/usr/share/custom-backup.sh<<-\EOF  
+#!/bin/sh
+get_smallest_mounted_disk() {
+    # 使用 lsblk 列出挂载在 /mnt/ 下的设备并过滤掉小于 100M 的设备
+    lsblk -o NAME,SIZE,MOUNTPOINT | grep "/mnt/" | awk '$2 ~ /[0-9.]+[G]/ || ($2 ~ /[0-9.]+M/ && $2+0 > 100) {print $1, $2}' > /tmp/tmdisk
+
+    # 计算最小的磁盘并将其路径存入 tmdisk 变量
+    tmdisk=/mnt/$(grep "" /tmp/tmdisk | awk '
+    $2 ~ /M/ {size = $2+0} 
+    $2 ~ /G/ {size = $2*1024} 
+    NR == 1 {min = size; line = $1} 
+    NR > 1 && size < min {min = size; line = $1} 
+    END {gsub(/[^a-zA-Z0-9]/, "", line); print line}')
+
+    # 输出结果
+     echo "$tmdisk"
+}
+# 调用 get_smallest_mounted_disk 函数并将结果存储到变量 disk_path 中
+disk_path=$(get_smallest_mounted_disk)
+
+BACKUP_DIR="${disk_path}/custom-backup"
+BACKUP_FILE="${disk_path}/custom-backup.tar.gz"
+
+# 创建备份目录
+mkdir -p $BACKUP_DIR
+
+# 使用 tar 命令直接备份文件和目录，保留目录结构
+tar -czvf $BACKUP_FILE \
+    /usr/bin/xray \
+    /usr/share/v2ray/geoip.dat \
+    /usr/share/passwall/rules \
+    /usr/share/v2ray/geosite.dat
+
+# 检查备份是否成功
+if [ $? -eq 0 ]; then
+    echo "Backup successful: $BACKUP_FILE"
+else
+    echo "Backup failed"
+fi
+
+# 清理临时备份目录
+rm -rf $BACKUP_DIR
+exit 0
+EOF
+
+cat>files/usr/share/custom-restore.sh<<-\EOF
+#!/bin/sh
+get_smallest_mounted_disk() {
+    # 使用 lsblk 列出挂载在 /mnt/ 下的设备并过滤掉小于 100M 的设备
+    lsblk -o NAME,SIZE,MOUNTPOINT | grep "/mnt/" | awk '$2 ~ /[0-9.]+[G]/ || ($2 ~ /[0-9.]+M/ && $2+0 > 100) {print $1, $2}' > /tmp/tmdisk
+
+    # 计算最小的磁盘并将其路径存入 tmdisk 变量
+    tmdisk=/mnt/$(grep "" /tmp/tmdisk | awk '
+    $2 ~ /M/ {size = $2+0} 
+    $2 ~ /G/ {size = $2*1024} 
+    NR == 1 {min = size; line = $1} 
+    NR > 1 && size < min {min = size; line = $1} 
+    END {gsub(/[^a-zA-Z0-9]/, "", line); print line}')
+
+    # 输出结果
+     echo "$tmdisk"
+}
+# 调用 get_smallest_mounted_disk 函数并将结果存储到变量 disk_path 中
+disk_path=$(get_smallest_mounted_disk)
+
+# 构建 BACKUP_FILE 路径并输出
+BACKUP_FILE="${disk_path}/custom-backup.tar.gz"
+TEMP_RESTORE_DIR="${disk_path}/restore-tmp"
+
+# 检查备份文件是否存在
+if [ ! -f "$BACKUP_FILE" ]; then
+    echo "Backup file not found: $BACKUP_FILE"
+    exit 1
+fi
+
+# 创建临时恢复目录
+mkdir -p "$TEMP_RESTORE_DIR"
+
+# 解压备份文件到临时恢复目录
+tar -xzvf "$BACKUP_FILE" -C "$TEMP_RESTORE_DIR"
+
+# 检查解压是否成功
+if [ $? -ne 0 ]; then
+    echo "Extraction failed"
+    rm -rf "$TEMP_RESTORE_DIR"
+    exit 1
+fi
+
+# 创建目标目录
+mkdir -p /usr/share/v2ray/
+
+# 复制文件到系统对应位置
+cp -r "$TEMP_RESTORE_DIR/usr/bin/xray" "/usr/bin/xray"
+cp -r "$TEMP_RESTORE_DIR/usr/share/v2ray/geoip.dat" "/usr/share/v2ray/geoip.dat"
+cp -r "$TEMP_RESTORE_DIR/usr/share/v2ray/geosite.dat" "/usr/share/v2ray/geosite.dat"
+
+# 检查复制是否成功
+if [ $? -eq 0 ]; then
+    echo "Restore successful"
+else
+    echo "Restore failed"
+fi
+
+# 清理临时恢复目录
+rm -rf "$TEMP_RESTORE_DIR"
+
+# 清理备份文件
+rm -rf "$BACKUP_FILE"
+exit 0
+EOF
