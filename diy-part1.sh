@@ -442,18 +442,48 @@ TEMP_DIR="/tmp/passwall_update"
 RULE_DIR="/usr/share/passwall/rules"
 RULE_BACKUP="/tmp/passwall_rule_backup"
 PSVERSION_FILE="/usr/share/psversion"
+UNZIP_URL="https://downloads.openwrt.org/releases/packages-23.05/x86_64/packages/unzip_6.0-8_x86_64.ipk"
+UNZIP_PACKAGE="/tmp/unzip_6.0-8_x86_64.ipk"
 
 RED='\033[0;31m'; BLUE='\033[0;34m'; ORANGE='\033[0;33m'; NC='\033[0m'
 echo_red(){ echo -e "${RED}$1${NC}"; }
 echo_blue(){ echo -e "${BLUE}$1${NC}"; }
 echo_orange(){ echo -e "${ORANGE}$1${NC}"; }
 
-echo_blue "== Passwall=="
-echo_blue "正在准备环境…"
+echo_blue "== Passwall 更新脚本 =="
+echo_blue "正在做更新前的准备工作..."
+
+########################################
+# 0. 检查并安装 unzip（如果需要）
+########################################
+if opkg list-installed | awk '{print $1}' | grep -qx "unzip"; then
+  echo_blue "unzip 已经安装，跳过安装步骤。"
+else
+  echo_orange "检测到系统未安装 unzip，开始下载..."
+  wget -q --show-progress "$UNZIP_URL" -O "$UNZIP_PACKAGE"
+  
+  if [ $? -eq 0 ]; then
+    echo_blue "下载成功，开始安装 unzip 包..."
+    opkg install "$UNZIP_PACKAGE"
+    
+    if [ $? -eq 0 ]; then
+      echo_blue "unzip 安装成功！"
+      rm -f "$UNZIP_PACKAGE"
+    else
+      echo_red "unzip 安装失败！"
+      rm -f "$UNZIP_PACKAGE"
+      exit 1
+    fi
+  else
+    echo_red "unzip 下载失败！"
+    exit 1
+  fi
+fi
 
 ########################################
 # 1. 记录已安装的后端
 ########################################
+echo_blue "正在检测已安装的后端组件..."
 BACKENDS="sing-box xray-core v2ray-plugin haproxy ipt2socks geoview"
 SAVED_BACKENDS=""
 for p in $BACKENDS; do
@@ -465,6 +495,7 @@ done
 ########################################
 # 2. 获取 GitHub 最新 release
 ########################################
+echo_blue "正在获取最新版本信息..."
 fetch_latest_json() {
   command -v curl >/dev/null 2>&1 && curl -s https://api.github.com/repos/xiaorouji/openwrt-passwall/releases/latest \
     || wget -qO- https://api.github.com/repos/xiaorouji/openwrt-passwall/releases/latest
@@ -511,7 +542,7 @@ reply=${reply:-y}
 # 5. 下载新版本
 ########################################
 mkdir -p "$TEMP_DIR"
-echo_blue "开始下载…"
+echo_blue "开始下载新版本..."
 
 wget -O "$TEMP_DIR/$app_file" "$luci_app_passwall_url" || { echo_red "主程序下载失败"; exit 1; }
 wget -O "$TEMP_DIR/$i18n_file" "$luci_i18n_passwall_url" || { echo_red "中文包下载失败"; exit 1; }
@@ -519,7 +550,7 @@ wget -O "$TEMP_DIR/$i18n_file" "$luci_i18n_passwall_url" || { echo_red "中文�
 ########################################
 # 6. 安装前隐藏自定义规则（安静模式核心）
 ########################################
-echo_blue "临时隐藏你的自定义规则（避免 opkg 提示）…"
+echo_blue "临时隐藏你的自定义规则（避免 opkg 提示）..."
 
 mkdir -p "$RULE_BACKUP"
 for f in direct_host direct_ip proxy_host; do
@@ -529,13 +560,14 @@ done
 ########################################
 # 7. 停止 Passwall
 ########################################
+echo_blue "正在停止 Passwall 服务..."
 [ -x /etc/init.d/passwall ] && /etc/init.d/passwall stop || true
 sleep 1
 
 ########################################
 # 8. 清理 nft 表（修复升级报错）
 ########################################
-echo_blue "清理 Passwall 旧 nftset…"
+echo_blue "清理 Passwall 旧 nftset..."
 
 nft flush ruleset 2>/dev/null || true
 for table in passwall passwall_chn passwall_geo passwall1; do
@@ -545,7 +577,7 @@ done
 ########################################
 # 9. 安装 Passwall（不会提示 conffile）
 ########################################
-echo_blue "安装新版本…"
+echo_blue "安装新版本..."
 
 opkg install "$TEMP_DIR/$app_file" --force-overwrite --force-reinstall
 opkg install "$TEMP_DIR/$i18n_file" --force-overwrite --force-reinstall
@@ -553,7 +585,7 @@ opkg install "$TEMP_DIR/$i18n_file" --force-overwrite --force-reinstall
 ########################################
 # 10. 恢复你的自定义规则（安静模式核心）
 ########################################
-echo_blue "恢复你的自定义规则…"
+echo_blue "恢复你的自定义规则..."
 
 for f in direct_host direct_ip proxy_host; do
   [ -f "$RULE_BACKUP/$f" ] && mv "$RULE_BACKUP/$f" "$RULE_DIR/$f" 2>/dev/null || true
@@ -562,7 +594,7 @@ done
 ########################################
 # 11. 恢复后端组件
 ########################################
-echo_blue "恢复后端组件…"
+echo_blue "恢复后端组件..."
 
 for p in $SAVED_BACKENDS; do
   if ! opkg list-installed | awk '{print $1}' | grep -qx "$p"; then
@@ -574,131 +606,20 @@ done
 ########################################
 # 12. 初始化 nft 环境（避免 netlink 报错）
 ########################################
-echo_blue "初始化 nft 环境…"
+echo_blue "初始化 nft 环境..."
 sleep 1
 nft flush ruleset 2>/dev/null || true
 
 ########################################
 # 13. 重启 Passwall
 ########################################
-echo_blue "重启 Passwall…"
+echo_blue "重启 Passwall..."
 /etc/init.d/passwall restart || true
 
 echo "$version_new" > "$PSVERSION_FILE"
 echo_blue "=== Passwall 更新完成（安静模式，无提示）=== "
 
 rm -rf "$TEMP_DIR" "$RULE_BACKUP"
-exit 0
-EOF
-
-cat> files/usr/share/custom-backup.sh<<-\EOF  
-#!/bin/sh
-get_smallest_mounted_disk() {
-    # 使用 lsblk 列出挂载在 /mnt/ 下的设备并过滤掉小于 100M 的设备
-    lsblk -o NAME,SIZE,MOUNTPOINT | grep "/mnt/" | awk '$2 ~ /[0-9.]+[G]/ || ($2 ~ /[0-9.]+M/ && $2+0 > 100) {print $1, $2}' > /tmp/tmdisk
-
-    # 计算最小的磁盘并将其路径存入 tmdisk 变量
-    tmdisk=/mnt/$(grep "" /tmp/tmdisk | awk '
-    $2 ~ /M/ {size = $2+0} 
-    $2 ~ /G/ {size = $2*1024} 
-    NR == 1 {min = size; line = $1} 
-    NR > 1 && size < min {min = size; line = $1} 
-    END {gsub(/[^a-zA-Z0-9]/, "", line); print line}')
-
-    # 输出结果
-     echo "$tmdisk"
-}
-# 调用 get_smallest_mounted_disk 函数并将结果存储到变量 disk_path 中
-disk_path=$(get_smallest_mounted_disk)
-
-BACKUP_DIR="${disk_path}/custom-backup"
-BACKUP_FILE="${disk_path}/custom-backup.tar.gz"
-
-# 创建备份目录
-mkdir -p $BACKUP_DIR
-
-# 使用 tar 命令直接备份文件和目录，保留目录结构
-tar -czvf $BACKUP_FILE \
-    /usr/bin/xray \
-    /usr/share/v2ray/geoip.dat \
-    /usr/share/passwall/rules \
-    /usr/share/v2ray/geosite.dat
-
-# 检查备份是否成功
-if [ $? -eq 0 ]; then
-    echo "Backup successful: $BACKUP_FILE"
-else
-    echo "Backup failed"
-fi
-
-# 清理临时备份目录
-rm -rf $BACKUP_DIR
-exit 0
-EOF
-
-cat>files/usr/share/custom-restore.sh<<-\EOF
-#!/bin/sh
-get_smallest_mounted_disk() {
-    # 使用 lsblk 列出挂载在 /mnt/ 下的设备并过滤掉小于 100M 的设备
-    lsblk -o NAME,SIZE,MOUNTPOINT | grep "/mnt/" | awk '$2 ~ /[0-9.]+[G]/ || ($2 ~ /[0-9.]+M/ && $2+0 > 100) {print $1, $2}' > /tmp/tmdisk
-
-    # 计算最小的磁盘并将其路径存入 tmdisk 变量
-    tmdisk=/mnt/$(grep "" /tmp/tmdisk | awk '
-    $2 ~ /M/ {size = $2+0} 
-    $2 ~ /G/ {size = $2*1024} 
-    NR == 1 {min = size; line = $1} 
-    NR > 1 && size < min {min = size; line = $1} 
-    END {gsub(/[^a-zA-Z0-9]/, "", line); print line}')
-
-    # 输出结果
-     echo "$tmdisk"
-}
-# 调用 get_smallest_mounted_disk 函数并将结果存储到变量 disk_path 中
-disk_path=$(get_smallest_mounted_disk)
-
-# 构建 BACKUP_FILE 路径并输出
-BACKUP_FILE="${disk_path}/custom-backup.tar.gz"
-TEMP_RESTORE_DIR="${disk_path}/restore-tmp"
-
-# 检查备份文件是否存在
-if [ ! -f "$BACKUP_FILE" ]; then
-    echo "Backup file not found: $BACKUP_FILE"
-    exit 1
-fi
-
-# 创建临时恢复目录
-mkdir -p "$TEMP_RESTORE_DIR"
-
-# 解压备份文件到临时恢复目录
-tar -xzvf "$BACKUP_FILE" -C "$TEMP_RESTORE_DIR"
-
-# 检查解压是否成功
-if [ $? -ne 0 ]; then
-    echo "Extraction failed"
-    rm -rf "$TEMP_RESTORE_DIR"
-    exit 1
-fi
-
-# 创建目标目录
-mkdir -p /usr/share/v2ray/
-
-# 复制文件到系统对应位置
-cp -r "$TEMP_RESTORE_DIR/usr/bin/xray" "/usr/bin/xray"
-cp -r "$TEMP_RESTORE_DIR/usr/share/v2ray/geoip.dat" "/usr/share/v2ray/geoip.dat"
-cp -r "$TEMP_RESTORE_DIR/usr/share/v2ray/geosite.dat" "/usr/share/v2ray/geosite.dat"
-
-# 检查复制是否成功
-if [ $? -eq 0 ]; then
-    echo "Restore successful"
-else
-    echo "Restore failed"
-fi
-
-# 清理临时恢复目录
-rm -rf "$TEMP_RESTORE_DIR"
-
-# 清理备份文件
-rm -rf "$BACKUP_FILE"
 exit 0
 EOF
 
