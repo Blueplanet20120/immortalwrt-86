@@ -50,122 +50,156 @@ EOF
 cat>rename.sh<<-\EOF
 #!/bin/bash
 
-# 清理旧文件
-rm -rf bin/targets/x86/64/config.buildinfo
-rm -rf bin/targets/x86/64/feeds.buildinfo
-rm -rf bin/targets/x86/64/immortalwrt-x86-64-generic-kernel.bin
-rm -rf bin/targets/x86/64/immortalwrt-x86-64-generic-squashfs-rootfs.img.gz
-rm -rf bin/targets/x86/64/immortalwrt-x86-64-generic-rootfs.tar.gz
-rm -rf bin/targets/x86/64/immortalwrt-x86-64-generic.manifest
-rm -rf bin/targets/x86/64/sha256sums
-rm -rf bin/targets/x86/64/profiles.json
-rm -rf bin/targets/x86/64/version.buildinfo
-rm -rf bin/targets/x86/64/immortalwrt-x86-64-generic-ext4-rootfs.img.gz
-rm -rf bin/targets/x86/64/immortalwrt-x86-64-generic-ext4-combined-efi.img.gz
-rm -rf bin/targets/x86/64/immortalwrt-x86-64-generic-ext4-combined.img.gz
-sleep 2
+TARGET_DIR="bin/targets/x86/64"
 
-# 读取版本号与内核补丁版本
-rename_version=$(cat files/etc/lenyu_version)
-str1=$(grep "KERNEL_PATCHVER:=" target/linux/x86/Makefile | cut -d '=' -f2)
+# 1. 兜底检查，确保在正确的上下文中执行
+if [ ! -d "$TARGET_DIR" ]; then
+    echo "Error: 找不到 $TARGET_DIR，请确认脚本是否在 openwrt 根目录下执行。"
+    exit 1
+fi
 
-# 动态获取补丁小版本
-kernel_include_file="include/kernel-${str1}"
+# 确保存放 version 记录的目录存在
+mkdir -p wget
+
+# 2. 批量清理冗余文件（使用通配符替代逐行硬编码，更简洁且容错率高）
+rm -f ${TARGET_DIR}/*.buildinfo
+rm -f ${TARGET_DIR}/*.manifest
+rm -f ${TARGET_DIR}/sha256sums
+rm -f ${TARGET_DIR}/profiles.json
+rm -f ${TARGET_DIR}/*-kernel.bin
+rm -f ${TARGET_DIR}/*-rootfs.*
+rm -f ${TARGET_DIR}/*-ext4-*.img.gz
+
+# 3. 读取前面 lenyu.sh 注入的自定义版本号
+if [ -f "files/etc/lenyu_version" ]; then
+    rename_version=$(cat files/etc/lenyu_version)
+else
+    rename_version="unknown"
+    echo "Warning: files/etc/lenyu_version 未找到，使用默认版本号 fallback。"
+fi
+
+# 4. 动态解析内核大版本与补丁号 (增强正则与去空格处理)
+kernel_patchver=$(grep "KERNEL_PATCHVER:=" target/linux/x86/Makefile | cut -d '=' -f2 | tr -d ' ')
+kernel_include_file="include/kernel-${kernel_patchver}"
+
 if [ -f "$kernel_include_file" ]; then
-    ver=$(grep "LINUX_VERSION-${str1} =" "$kernel_include_file" | cut -d '.' -f3)
+    # 提取类似 LINUX_VERSION-6.6 = .32 中的 32
+    kernel_subver=$(grep "^LINUX_VERSION-${kernel_patchver}" "$kernel_include_file" | awk -F'.' '{print $NF}' | tr -d ' ')
+    [ -n "$kernel_subver" ] && ver=".${kernel_subver}" || ver=""
 else
     ver=""
 fi
 
-# 定义源镜像和目标名称前缀
-src_img=bin/targets/x86/64/immortalwrt-x86-64-generic-squashfs-combined.img.gz
-src_efi=bin/targets/x86/64/immortalwrt-x86-64-generic-squashfs-combined-efi.img.gz
-base="immortalwrt_x86-64-${rename_version}_${str1}.${ver}"
+# 5. 组合最终的文件名 Base
+base_name="immortalwrt_x86-64-${rename_version}_${kernel_patchver}${ver}"
 
-# 重命名镜像，添加存在性检查
-if [ -f "$src_img" ] && [ -f "$src_efi" ]; then
-    mv "$src_img"   "bin/targets/x86/64/${base}_sta_Lenyu.img.gz"
-    mv "$src_efi"   "bin/targets/x86/64/${base}_uefi-gpt_sta_Lenyu.img.gz"
+dest_img_name="${base_name}_sta_Lenyu.img.gz"
+dest_efi_name="${base_name}_uefi-gpt_sta_Lenyu.img.gz"
+
+# 6. 切换到目标目录执行重命名与 MD5 生成
+cd "$TARGET_DIR" || exit 1
+
+# 处理 Legacy BIOS 传统固件
+if [ -f "immortalwrt-x86-64-generic-squashfs-combined.img.gz" ]; then
+    mv "immortalwrt-x86-64-generic-squashfs-combined.img.gz" "$dest_img_name"
+    md5sum "$dest_img_name" > immortalwrt_sta.md5
 else
-    echo "镜像文件不存在，无法重命名：$src_img 或 $src_efi"
+    echo "Warning: 传统启动镜像文件不存在，已跳过。"
 fi
 
-# 生成版本列表
-ls bin/targets/x86/64 | grep "gpt_sta_Lenyu.img" | cut -d '-' -f3 | cut -d '_' -f1-2 > wget/op_version1
+# 处理 UEFI 固件
+if [ -f "immortalwrt-x86-64-generic-squashfs-combined-efi.img.gz" ]; then
+    mv "immortalwrt-x86-64-generic-squashfs-combined-efi.img.gz" "$dest_efi_name"
+    md5sum "$dest_efi_name" > immortalwrt_sta_uefi.md5
+else
+    echo "Warning: UEFI 镜像文件不存在，已跳过。"
+fi
 
-# 生成 MD5 列表
-ls -1 bin/targets/x86/64 > wget/open_sta_md5
-sta_version=$(grep "_uefi-gpt_sta_Lenyu.img.gz" wget/open_sta_md5 | cut -d '-' -f3 | cut -d '_' -f1-2)
-immortalwrt_sta=immortalwrt_x86-64-${sta_version}_sta_Lenyu.img.gz
-immortalwrt_sta_uefi=immortalwrt_x86-64-${sta_version}_uefi-gpt_sta_Lenyu.img.gz
-
-# 切换目录并生成 MD5 文件
-cd bin/targets/x86/64 || exit 1
-md5sum "$immortalwrt_sta" > immortalwrt_sta.md5
-md5sum "$immortalwrt_sta_uefi" > immortalwrt_sta_uefi.md5
+# 7. 回到根目录，生成供 GitHub Actions Release 提取的标签与文件清单
+cd - >/dev/null
+echo "${base_name}_sta_Lenyu" > wget/op_version1
+ls -1 ${TARGET_DIR} > wget/open_sta_md5
 
 exit 0
 EOF
 
 cat>lenyu.sh<<-\EOOF
 #!/bin/bash
-lenyu_version="`date '+%y%m%d%H%M'`_sta_Len yu" 
-echo $lenyu_version >  wget/DISTRIB_REVISION1 
-echo $lenyu_version | cut -d _ -f 1 >  files/etc/lenyu_version  
-new_DISTRIB_REVISION=`cat  wget/DISTRIB_REVISION1`
-#
-grep "Check_Update.sh"  package/emortal/default-settings/files/99-default-settings
-if [ $? != 0 ]; then
-	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
-	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
-	sed -i '$ a alias lenyu="sh /usr/share/Check_Update.sh"' /etc/profile
+
+# 1. 预先创建需要的目录，防止报错
+mkdir -p wget files/etc
+
+# 2. 生成版本号 (统一使用下划线代替不规范的空格，保证变量安全性)
+lenyu_version="$(date '+%y%m%d%H%M')_sta_Len_yu" 
+echo "$lenyu_version" > wget/DISTRIB_REVISION1 
+echo "$lenyu_version" | cut -d _ -f 1 > files/etc/lenyu_version  
+new_DISTRIB_REVISION=$(cat wget/DISTRIB_REVISION1)
+
+# 定义需要修改的默认设置文件路径
+TARGET_FILE="package/emortal/default-settings/files/99-default-settings"
+
+# 容错处理：确保目标文件存在
+if [ ! -f "$TARGET_FILE" ]; then
+    echo "Error: $TARGET_FILE not found!"
+    exit 1
+fi
+
+# 3. 注入 Check_Update.sh 别名和系统版本描述
+if ! grep -q "Check_Update.sh" "$TARGET_FILE"; then
+    # 彻底清除文件末尾的 exit 0，防止逻辑中断
+    sed -i 's/exit 0//g' "$TARGET_FILE"
+    # 注意：此处 EOF 前不要加斜杠，以允许 $new_DISTRIB_REVISION 变量展开；
+    # 内部包含 $ 的普通命令则使用 \$ 转义。
+    cat >> "$TARGET_FILE" <<-EOF
+	sed -i '\$ a alias lenyu="sh /usr/share/Check_Update.sh"' /etc/profile
 	sed -i '/DISTRIB_DESCRIPTION/d' /etc/openwrt_release
 	echo "DISTRIB_DESCRIPTION='$new_DISTRIB_REVISION'" >> /etc/openwrt_release
 	exit 0
 	EOF
 fi
-grep "Lenyu-auto.sh"  package/emortal/default-settings/files/99-default-settings
-if [ $? != 0 ]; then
-	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
-	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
+
+# 4. 注入 Lenyu-auto.sh 别名
+if ! grep -q "Lenyu-auto.sh" "$TARGET_FILE"; then
+    sed -i 's/exit 0//g' "$TARGET_FILE"
+    cat >> "$TARGET_FILE" <<-\EOF
 	sed -i '$ a alias lenyu-auto="sh /usr/share/Lenyu-auto.sh"' /etc/profile
 	exit 0
 	EOF
 fi
 
-grep "Lenyu-pw.sh"  package/emortal/default-settings/files/99-default-settings
-if [ $? != 0 ]; then
-	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
-	cat>> package/emortal/default-settings/files/99-default-settings<<-EOF
+# 5. 注入 Lenyu-pw.sh 别名
+if ! grep -q "Lenyu-pw.sh" "$TARGET_FILE"; then
+    sed -i 's/exit 0//g' "$TARGET_FILE"
+    cat >> "$TARGET_FILE" <<-\EOF
 	sed -i '$ a alias lenyu-pw="sh /usr/share/Lenyu-pw.sh"' /etc/profile
 	exit 0
 	EOF
 fi
 
-grep "backup.tar.gz"  package/emortal/default-settings/files/99-default-settings
-if [ $? != 0 ]; then
-	sed -i 's/exit 0/ /'  package/emortal/default-settings/files/99-default-settings
-	cat>> package/emortal/default-settings/files/99-default-settings<<-\EOF
-	######添加定时执行rc.local任务
-	# 检查 /etc/crontabs/root 中 rc.local 的出现次数
-	RC_COUNT=$(grep -c "rc.local" /etc/crontabs/root)
+# 6. 注入 backup.tar.gz 定时恢复逻辑 (rc.local)
+if ! grep -q "custom-backup.tar.gz" "$TARGET_FILE"; then
+    sed -i 's/exit 0//g' "$TARGET_FILE"
+    cat >> "$TARGET_FILE" <<-\EOF
+	###### 添加定时执行 rc.local 任务
+	# 检查 /etc/crontabs/root 中 rc.local 的出现次数，忽略找不到文件时的报错
+	RC_COUNT=$(grep -c "rc.local" /etc/crontabs/root 2>/dev/null || echo 0)
 	
 	# 删除多余的 rc.local 条目
 	if [ "$RC_COUNT" -gt 1 ]; then
-	    awk '/rc.local/ && !seen {print; seen=1; next} !/rc.local/' /etc/crontabs/root > tmpfile && mv tmpfile /etc/crontabs/root
+	    awk '/rc.local/ && !seen {print; seen=1; next} !/rc.local/' /etc/crontabs/root > /tmp/crontabs_root_tmp && mv /tmp/crontabs_root_tmp /etc/crontabs/root
 	    echo "Removed extra rc.local entries, kept one" >> /tmp/restore.log
 	elif [ "$RC_COUNT" -eq 0 ]; then
 	    # 如果没有 rc.local，添加一条
 	    echo "@reboot sleep 60 && bash /etc/rc.local > /dev/null 2>&1 &" >> /etc/crontabs/root
 	    echo "Add rc.local succeeded" >> /tmp/restore.log
 	else
-	    # 如果只存在一条
 	    echo "rc.local already exists, no action taken" >> /tmp/restore.log
 	fi
-	#####
-	cat> /etc/rc.local<<-\EOFF
+	
+	##### 覆写 /etc/rc.local 文件内容
+	cat > /etc/rc.local <<-\EOFF
 	# Restoring the ROM configuration file
- 	get_smallest_mounted_disk() {
+	get_smallest_mounted_disk() {
 	    # 使用 lsblk 列出挂载在 /mnt/ 下的设备并过滤掉小于 100M 的设备
 	    lsblk -o NAME,SIZE,MOUNTPOINT | grep "/mnt/" | awk '$2 ~ /[0-9.]+[G]/ || ($2 ~ /[0-9.]+M/ && $2+0 > 100) {print $1, $2}' > /tmp/tmdisk
 	    # 计算最小的磁盘并将其路径存入 tmdisk 变量
@@ -177,27 +211,27 @@ if [ $? != 0 ]; then
 	    END {gsub(/[^a-zA-Z0-9]/, "", line); print line}')
 	
 	    # 输出结果
-	     echo "$tmdisk"
+	    echo "$tmdisk"
 	}
-	# 调用 get_smallest_mounted_disk 函数并将结果存储到变量 disk_path 中
-	disk_path=$(get_smallest_mounted_disk)
-	if [ -f ${disk_path}/custom-backup.tar.gz ]; then
- 		echo "Restore script already exists: /tmp/custom-backup.tar.gz"
-		echo "Performing Restore..."
-		bash /usr/share/custom-restore.sh
-		echo "Restore completed."
-		echo "Restore successful $(date '+%Y-%m-%d %H:%M:%S')" >> /tmp/restore.log
-		
-		# Restart Passwall service
-		/etc/init.d/passwall restart
-		exit 0
-	else
-		echo "Restore failed $(date '+%Y-%m-%d %H:%M:%S')" >> /tmp/restore.log
-		exit 1
-	fi
 	
-		exit 0
-		EOFF
+	# 调用函数并将结果存储到变量
+	disk_path=$(get_smallest_mounted_disk)
+	if [ -f "${disk_path}/custom-backup.tar.gz" ]; then
+	    echo "Restore script already exists: ${disk_path}/custom-backup.tar.gz"
+	    echo "Performing Restore..."
+	    bash /usr/share/custom-restore.sh
+	    echo "Restore completed."
+	    echo "Restore successful $(date '+%Y-%m-%d %H:%M:%S')" >> /tmp/restore.log
+	    
+	    # Restart Passwall service
+	    /etc/init.d/passwall restart
+	    exit 0
+	else
+	    echo "Restore failed: file not found $(date '+%Y-%m-%d %H:%M:%S')" >> /tmp/restore.log
+	    exit 1
+	fi
+	exit 0
+	EOFF
 	exit 0
 	EOF
 fi
