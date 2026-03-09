@@ -128,11 +128,9 @@ jobs:
         cd openwrt
         echo -e 'CONFIG_DEVEL=y\nCONFIG_CCACHE=y' >> .config
         
-        # ☢️ 核弹级防 404 修复：直接篡改 Rust 的 Makefile 判定变量
-        # 将合法的配置变量替换为无效变量，强行逼迫 Makefile 走向 false 分支（即本地全量编译 LLVM）
-        sed -i 's/CONFIG_RUST_USE_CI_LLVM/FORCE_DISABLE_CI_LLVM/g' feeds/packages/lang/rust/Makefile
-        # 顺手补一刀，防止它有硬编码的 true 字符串
-        sed -i 's/download-ci-llvm = true/download-ci-llvm = false/g' feeds/packages/lang/rust/Makefile
+        # ☢️ 降维打击：直接在 Rust Makefile 的绝对第一行强行注入关闭变量
+        # 这样源码里的 RUST_USE_CI_LLVM ?= 1 就会因为变量已存在而全部失效！
+        sed -i '1i RUST_USE_CI_LLVM:=0' feeds/packages/lang/rust/Makefile
         
         make defconfig
         make download -j8
