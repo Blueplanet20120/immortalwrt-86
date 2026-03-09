@@ -126,7 +126,16 @@ jobs:
       id: package
       run: |
         cd openwrt
+        # 1. 常规缓存与开发选项
         echo -e 'CONFIG_DEVEL=y\nCONFIG_CCACHE=y' >> .config
+        
+        # 2. 【防 404 终极绝杀】：利用 kconfig 标准语法，强行覆盖默认值，彻底禁用 Rust 预编译 LLVM
+        sed -i 's/CONFIG_RUST_USE_CI_LLVM=y/# CONFIG_RUST_USE_CI_LLVM is not set/g' .config
+        echo '# CONFIG_RUST_USE_CI_LLVM is not set' >> .config
+        
+        # 3. 再从源头把 Rust 的 Config.in 默认值也改成关闭 (双重保险)
+        [ -f feeds/packages/lang/rust/Config.in ] && sed -i 's/default y/default n/g' feeds/packages/lang/rust/Config.in || true
+        
         make defconfig
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
