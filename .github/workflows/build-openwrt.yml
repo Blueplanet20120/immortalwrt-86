@@ -128,9 +128,12 @@ jobs:
         cd openwrt
         echo -e 'CONFIG_DEVEL=y\nCONFIG_CCACHE=y' >> .config
         
-        # ☢️ 降维打击：直接在 Rust Makefile 的绝对第一行强行注入关闭变量
-        # 这样源码里的 RUST_USE_CI_LLVM ?= 1 就会因为变量已存在而全部失效！
-        sed -i '1i RUST_USE_CI_LLVM:=0' feeds/packages/lang/rust/Makefile
+        # ☢️ 终极必杀技：专门对付 Host 架构的硬编码流氓判定
+        # 锁定带有 download-ci-llvm 的行，把里面的 true 全部干掉换成 false！
+        # 无论源码怎么变，它的判定逻辑最终都会变成 (...,false,false)，彻底断绝下载行为。
+        if [ -f feeds/packages/lang/rust/Makefile ]; then
+          sed -i '/download-ci-llvm/ s/true/false/g' feeds/packages/lang/rust/Makefile
+        fi
         
         make defconfig
         make download -j8
