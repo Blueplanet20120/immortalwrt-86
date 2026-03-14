@@ -25,6 +25,7 @@ on:
      #- cron: 00 22 * * *
     
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   REPO_URL: --single-branch --filter=blob:none https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-24.10
   FEEDS_CONF: feeds.conf.default
