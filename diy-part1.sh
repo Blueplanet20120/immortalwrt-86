@@ -648,6 +648,7 @@ echo "$version_new" > "$PSVERSION_FILE"
 
 rm -rf "$TEMP_DIR" "$RULE_BACKUP"
 
-echo_blue "=== Passwall 更新完成（23.05-24.10 最终锁定版）==="
+echo_blue "=== Passwall 更新完成（23.05-24.10 最终锁定版，重启系统）==="
+reboot
 exit 0
 EOF
