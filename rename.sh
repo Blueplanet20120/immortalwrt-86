@@ -19,7 +19,8 @@ rm -f ${TARGET_DIR}/profiles.json
 rm -f ${TARGET_DIR}/*-kernel.bin
 rm -f ${TARGET_DIR}/*-rootfs.*
 rm -f ${TARGET_DIR}/*.vmdk
-
+rm -f ${TARGET_DIR}/*ext4-combined-efi.img.gz
+rm -f ${TARGET_DIR}/*ext4-combined.img.gz
 # 3. 读取前面 lenyu.sh 注入的自定义版本号
 if [ -f "files/etc/lenyu_version" ]; then
     rename_version=$(cat files/etc/lenyu_version)
