@@ -16,7 +16,6 @@ on:
   schedule:
      - cron: 0 0 */3 * *
 
-
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -43,7 +42,7 @@ jobs:
 
     - name: Compare Commit Hash
       id: cacheHash
-      uses: actions/cache@main
+      uses: actions/cache@v5
       with:
         path: .commitHash_All
         key: HEAD-${{ steps.combHeader.outputs.commitHash_All }}
@@ -62,18 +61,45 @@ jobs:
           keep_minimum_runs: 3
 
     - name: Remove old Releases
-      uses: dev-drprasad/delete-older-releases@master
-      with:
-        keep_latest: 5
-        keep_min_download_counts: 2
-        delete_expired_data: 60
-        delete_tags: true
       env:
-        GITHUB_TOKEN: ${{ secrets.OP_UPDATE }}
+        GH_TOKEN: ${{ secrets.OP_UPDATE }}
+      run: |
+        set -euo pipefail
+        # 与 dev-drprasad/delete-older-releases 一致：非 draft；排除最新 KEEP 条后，
+        # 在 KEEP_MIN 与 MAX_DAYS 均非 0 时，仅删除「下载量 < KEEP_MIN」或「早于 MAX_DAYS 天」的 release（含 tag）。
+        REPO="${{ github.repository }}"
+        KEEP=5
+        KEEP_MIN=2
+        MAX_DAYS=60
+        RAW=$(gh api --paginate "repos/${REPO}/releases")
+        DATA=$(echo "$RAW" | jq -s 'flatten(1)')
+        COUNT=$(echo "$DATA" | jq 'length')
+        if [ "${COUNT:-0}" -eq 0 ]; then
+          echo "No releases."
+          exit 0
+        fi
+        while IFS= read -r line; do
+          [ -z "$line" ] && continue
+          tag=$(echo "$line" | jq -r '.tag')
+          echo "Deleting release + tag: $tag"
+          gh release delete "$tag" --yes --cleanup-tag -R "$REPO" || true
+        done < <(echo "$DATA" | jq -c --argjson keep "$KEEP" --argjson kmin "$KEEP_MIN" --argjson md "$MAX_DAYS" '
+          [.[] | select(.draft == false and (.published_at | type == "string"))]
+          | sort_by(.published_at) | reverse
+          | map({
+              tag: .tag_name,
+              published_at: .published_at,
+              dl: ([.assets[]? | .download_count // 0] | add)
+            })
+          | .[$keep:]
+          | map(. + { days: (((now - (.published_at | fromdateiso8601)) / 86400) | floor) })
+          | map(select(.dl < $kmin or .days > $md))
+          | .[]
+        ')
         
     - name: Trigger build
       if: steps.cacheHash.outputs.cache-hit != 'true'
-      uses: peter-evans/repository-dispatch@main
+      uses: peter-evans/repository-dispatch@v4
       with:
         token: ${{ secrets.OP_UPDATE  }}
         event-type: openwrt_source_update
