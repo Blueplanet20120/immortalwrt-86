@@ -25,7 +25,6 @@ on:
      #- cron: 00 22 * * *
     
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   REPO_URL: --single-branch --filter=blob:none https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-24.10
   FEEDS_CONF: feeds.conf.default
@@ -46,7 +45,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Free Disk Space (Ubuntu)
       uses: jlumbroso/free-disk-space@main
@@ -157,7 +156,7 @@ jobs:
       run: df -hT
 
     - name: Upload bin directory
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
@@ -178,7 +177,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Upload firmware directory
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
@@ -221,7 +220,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Upload firmware to release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.op_update }}
@@ -232,16 +231,24 @@ jobs:
         prerelease: true
 
     - name: Delete workflow runs
-      uses: Blueplanet20120/delete-workflow-runs@main
+      uses: Mattraks/delete-workflow-runs@main
       with:
         retain_days: 2
         keep_minimum_runs: 10
 
     - name: Remove old Releases
-      uses: dev-drprasad/delete-older-releases@master
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-      with:
-        keep_latest: 10
-        delete_tags: true
       env:
-        GITHUB_TOKEN: ${{ secrets.op_update }}
+        GH_TOKEN: ${{ secrets.op_update }}
+      run: |
+        set -euo pipefail
+        REPO="${{ github.repository }}"
+        KEEP=10
+        i=0
+        while IFS= read -r tag; do
+          if [ "$i" -ge "$KEEP" ]; then
+            echo "Deleting release (and tag): $tag"
+            gh release delete "$tag" --yes --cleanup-tag -R "$REPO" || true
+          fi
+          i=$((i + 1))
+        done < <(gh api "repos/${REPO}/releases" --paginate --jq '.[] | .tag_name')
