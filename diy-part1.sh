@@ -29,6 +29,7 @@ touch wget/DISTRIB_REVISION3
 touch files/usr/share/Check_Update.sh
 touch files/usr/share/Lenyu-auto.sh
 touch files/usr/share/Lenyu-pw.sh
+touch /etc/sysupgrade.conf
 
 # backup config
 cat>>/etc/sysupgrade.conf<<-EOF
