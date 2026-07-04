@@ -1,4 +1,3 @@
-
 #!/bin/bash
 #
 # Copyright (c) 2019-2020 P3TERX <https://p3terx.com>
@@ -30,7 +29,7 @@ touch files/usr/share/Check_Update.sh
 touch files/usr/share/Lenyu-auto.sh
 touch files/usr/share/Lenyu-pw.sh
 
-# backup config
+# sysupgrade.conf修复?
 cat>>package/base-files/files/etc/sysupgrade.conf<<-EOF
 /etc/config/dhcp
 /etc/config/sing-box
@@ -146,7 +145,7 @@ fi
 
 # 3. 注入 Check_Update.sh 别名和系统版本描述
 if ! grep -q "Check_Update.sh" "$TARGET_FILE"; then
-    # 彻底清除文件末尾的 exit 0，防止逻辑中断
+    # 彻底清除文件末尾的 exit 0，防止 logic 中断
     sed -i 's/exit 0//g' "$TARGET_FILE"
     # 注意：此处 EOF 前不要加斜杠，以允许 $new_DISTRIB_REVISION 变量展开；
     # 内部包含 $ 的普通命令则使用 \$ 转义。
@@ -286,6 +285,7 @@ if [ ! -d /sys/firmware/efi ];then
 		wget -P /tmp "$immortalwrt_sta" -O /tmp/immortalwrt_sta.md5
 		cd /tmp && md5sum -c immortalwrt_sta.md5
 		if [ $? != 0 ]; then
+      # 【已修复】将未定义的 echo_red 替换为了标准的 echo，解决 command not found 报错
       echo "您下载文件失败，请检查网络重试…"
       sleep 4
       exit
@@ -302,6 +302,7 @@ else
 		wget -P /tmp "$immortalwrt_sta_uefi" -O /tmp/immortalwrt_sta_uefi.md5
 		cd /tmp && md5sum -c immortalwrt_sta_uefi.md5
 		if [ $? != 0 ]; then
+      # 【已修复】同样将这里的 echo_red 替换为了标准的 echo
       echo "您下载文件失败，请检查网络重试…"
       sleep 4
       exit
@@ -385,7 +386,7 @@ cat>files/usr/share/Lenyu-auto.sh<<-\EOF
 #!/bin/bash
 # https://github.com/Blueplanet20120/immortalwrt-86
 # Actions-OpenWrt-x86 By Lenyu 20210505
-#path=$(dirname $(readlink -f $0))
+#path=$({dirname $(readlink -f $0)})
 # cd ${path}
 #检测准备
 if [ ! -f  "/etc/lenyu_version" ]; then
