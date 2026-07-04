@@ -12,28 +12,25 @@
 
 # Uncomment a feed source
 # Add a feed helloword
-sed -i "/helloworld/d" "feeds.conf.default"
-sed -i "/nikki/d" "feeds.conf.default"
-echo "src-git helloworld https://github.com/fw876/helloworld.git" >> "feeds.conf.default"
-echo "src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main" >> "feeds.conf.default"
+sed -i "/helloworld/d" "feeds.conf.default"[cite: 3]
+sed -i "/nikki/d" "feeds.conf.default"[cite: 3]
+echo "src-git helloworld https://github.com/fw876/helloworld.git" >> "feeds.conf.default"[cite: 3]
+echo "src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main" >> "feeds.conf.default"[cite: 3]
 
 # Add a feed source
 
-mkdir -p files/usr/share
-mkdir -p files/etc/
-touch files/etc/lenyu_version
-mkdir wget
-touch wget/DISTRIB_REVISION1
-touch wget/DISTRIB_REVISION3
-touch files/usr/share/Check_Update.sh
-touch files/usr/share/Lenyu-auto.sh
-touch files/usr/share/Lenyu-pw.sh
+mkdir -p files/usr/share[cite: 3]
+mkdir -p files/etc/[cite: 3]
+touch files/etc/lenyu_version[cite: 3]
+mkdir wget[cite: 3]
+touch wget/DISTRIB_REVISION1[cite: 3]
+touch wget/DISTRIB_REVISION3[cite: 3]
+touch files/usr/share/Check_Update.sh[cite: 3]
+touch files/usr/share/Lenyu-auto.sh[cite: 3]
+touch files/usr/share/Lenyu-pw.sh[cite: 3]
 
-# 【已修复】修改为源码内部的相对路径，彻底解决 Permission denied 报错
-touch package/base-files/files/etc/sysupgrade.conf
-
-# 【已修复】修改为源码内部的相对路径
-cat>>package/base-files/files/etc/sysupgrade.conf<<-EOF
+# sysupgrade.conf 修复
+cat>>package/base-files/files/etc/sysupgrade.conf<<-EOF[cite: 3]
 /etc/config/dhcp
 /etc/config/sing-box
 /etc/config/romupdate
@@ -49,7 +46,7 @@ cat>>package/base-files/files/etc/sysupgrade.conf<<-EOF
 EOF
 
 
-cat>rename.sh<<-\EOF
+cat>rename.sh<<-\EOF[cite: 3]
 #!/bin/bash
 
 TARGET_DIR="bin/targets/x86/64"
@@ -63,7 +60,7 @@ fi
 # 确保存放 version 记录的目录存在
 mkdir -p wget
 
-# 2. 批量清理冗余文件（使用通配符替代逐行硬编码，更简洁且容错率高）
+# 2. 批量清理冗余 file（使用通配符替代逐行硬编码，更简洁且容错率高）
 rm -f ${TARGET_DIR}/*.buildinfo
 rm -f ${TARGET_DIR}/*.manifest
 rm -f ${TARGET_DIR}/sha256sums
@@ -125,7 +122,7 @@ ls -1 ${TARGET_DIR} > wget/open_sta_md5
 exit 0
 EOF
 
-cat>lenyu.sh<<-\EOOF
+cat>lenyu.sh<<-\EOOF[cite: 3]
 #!/bin/bash
 
 # 1. 预先创建需要的目录，防止报错
@@ -240,7 +237,8 @@ fi
 
 EOOF
 
-cat>files/usr/share/Check_Update.sh<<-\EOF
+# 【重点修复1】为 Check_Update.sh 的输出块改用 'EOF' 锁死，保护里面的内容不被 Actions 解释器误解析
+cat>files/usr/share/Check_Update.sh<<-\'EOF\'
 #!/bin/bash
 # https://github.com/Blueplanet20120/Actions-OpenWrt-x86
 # Actions-OpenWrt-x86 By Lenyu 20210505
@@ -288,7 +286,6 @@ if [ ! -d /sys/firmware/efi ];then
 		wget -P /tmp "$immortalwrt_sta" -O /tmp/immortalwrt_sta.md5
 		cd /tmp && md5sum -c immortalwrt_sta.md5
 		if [ $? != 0 ]; then
-      # 【已修复】将未定义的 echo_red 替换为了标准的 echo，解决 command not found 报错
       echo "您下载文件失败，请检查网络重试…"
       sleep 4
       exit
@@ -305,7 +302,6 @@ else
 		wget -P /tmp "$immortalwrt_sta_uefi" -O /tmp/immortalwrt_sta_uefi.md5
 		cd /tmp && md5sum -c immortalwrt_sta_uefi.md5
 		if [ $? != 0 ]; then
-      # 【已修复】同样将这里的 echo_red 替换为了标准的 echo
       echo "您下载文件失败，请检查网络重试…"
       sleep 4
       exit
@@ -385,7 +381,7 @@ open_op
 exit 0
 EOF
 
-cat>files/usr/share/Lenyu-auto.sh<<-\EOF
+cat>files/usr/share/Lenyu-auto.sh<<-\EOF[cite: 3]
 #!/bin/bash
 # https://github.com/Blueplanet20120/immortalwrt-86
 # Actions-OpenWrt-x86 By Lenyu 20210505
@@ -472,7 +468,8 @@ fi
 exit 0
 EOF
 
-cat>files/usr/share/Lenyu-pw.sh<<-\EOF
+# 【重点修复2】同样为 Lenyu-pw.sh 的输出块改用 'EOF' 锁死，彻底杜绝 echo_red 引发的 command not found 报错
+cat>files/usr/share/Lenyu-pw.sh<<-\'EOF\'
 #!/bin/sh
 set -u
 set -o pipefail
@@ -671,7 +668,7 @@ sleep 2
 echo_blue "拉起 Passwall 服务进程..."
 /etc/init.d/passwall restart 2>/dev/null || true
 
-echo_blue "重启本地 DNS 转发服务 (dnsmasq)..."
+echo_blue "重启本地 DNS 转发 service (dnsmasq)..."
 /etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
 
 echo_blue "清理残留的网络连接跟踪 (Conntrack)..."
