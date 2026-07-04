@@ -29,7 +29,10 @@ touch files/usr/share/Check_Update.sh
 touch files/usr/share/Lenyu-auto.sh
 touch files/usr/share/Lenyu-pw.sh
 
-# sysupgrade.conf修复?
+# 【已修复】修改为源码内部的相对路径，彻底解决 Permission denied 报错
+touch package/base-files/files/etc/sysupgrade.conf
+
+# 【已修复】修改为源码内部的相对路径
 cat>>package/base-files/files/etc/sysupgrade.conf<<-EOF
 /etc/config/dhcp
 /etc/config/sing-box
