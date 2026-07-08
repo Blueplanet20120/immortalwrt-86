@@ -33,7 +33,7 @@ touch files/usr/share/Lenyu-auto.sh
 touch files/usr/share/Lenyu-pw.sh
 
 # 修改为源码内部的相对路径，彻底解决 Permission denied 报错
-touch package/base-files/files/etc/sysupgrade.conf
+# touch package/base-files/files/etc/sysupgrade.conf
 
 # 修改为源码内部的相对路径
 cat>>package/base-files/files/etc/sysupgrade.conf<<-EOF
