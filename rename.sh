@@ -29,19 +29,19 @@ else
     echo "Warning: files/etc/lenyu_version 未找到，使用 fallback 版本号。"
 fi
 
-# 4. 动态解析内核大版本与补丁号
+# 4. 动态解析内核大版本与补丁号 (基于 25.12+ 确切文件结构)
 kernel_patchver=$(grep "KERNEL_PATCHVER:=" target/linux/x86/Makefile | cut -d '=' -f2 | tr -d ' ')
-kernel_include_file="include/kernel-${kernel_patchver}"
+kernel_generic_file="target/linux/generic/kernel-${kernel_patchver}"
 
-if [ -f "$kernel_include_file" ]; then
-    kernel_subver=$(grep "^LINUX_VERSION-${kernel_patchver}" "$kernel_include_file" | awk -F'.' '{print $NF}' | tr -d ' ')
-    [ -n "$kernel_subver" ] && ver=".${kernel_subver}" || ver=""
+if [ -f "$kernel_generic_file" ]; then
+    # 精准抓取 LINUX_VERSION-6.12 = .94 行，提取出其中的后半部分（带点的 .94）
+    ver=$(grep "LINUX_VERSION-${kernel_patchver}" "$kernel_generic_file" | cut -d '=' -f2 | tr -d ' ')
 else
     ver=""
 fi
 
 # 5. 组合【纯净版号】与【文件名 Base】
-# 纯净版号形如：2603081935_6.12.74 (专供前端插件和 GitHub 标题/Tag 使用)
+# 组合出来的 pure_version 格式形如：2607100810_sta_Len_yu_6.12.94
 pure_version="${rename_version}_${kernel_patchver}${ver}"
 base_name="immortalwrt_x86-64-${pure_version}"
 
