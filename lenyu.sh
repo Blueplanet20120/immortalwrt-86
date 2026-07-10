@@ -8,6 +8,9 @@ lenyu_version="$(date '+%y%m%d%H%M')_sta_Len_yu"
 echo "$lenyu_version" > wget/DISTRIB_REVISION1 
 echo "$lenyu_version" | cut -d _ -f 1 > files/etc/lenyu_version  
 new_DISTRIB_REVISION=$(cat wget/DISTRIB_REVISION1)
+# 3.替换 os-release 模板（适配ImmortalWrt 25.12 去除末尾的 %C 以移除 Git commit 号）
+os_release_template="package/base-files/files/usr/lib/os-release"
+[ -f "$os_release_template" ] && sed -i "s|OPENWRT_RELEASE=\"%D %V %C\"|OPENWRT_RELEASE=\"ImmortalWrt 25.12-${new_DISTRIB_REVISION}\"|g" "$os_release_template"
 
 # 定义需要修改的默认设置文件路径
 TARGET_FILE="package/emortal/default-settings/files/99-default-settings"
