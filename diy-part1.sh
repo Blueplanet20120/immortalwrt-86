@@ -159,7 +159,7 @@ fi
 
 # 3. 注入 Check_Update.sh 别名和系统版本描述
 if ! grep -q "Check_Update.sh" "$TARGET_FILE"; then
-    # 彻底清除文件末尾的 exit 0，防止 logic 中断
+    # 彻底清除文件末尾的 exit 0，防止逻辑中断
     sed -i 's/exit 0//g' "$TARGET_FILE"
     # 注意：此处 EOF 前不要加斜杠，以允许 $new_DISTRIB_REVISION 变量展开；
     # 内部包含 $ 的普通命令则使用 \$ 转义。
@@ -248,7 +248,6 @@ if ! grep -q "custom-backup.tar.gz" "$TARGET_FILE"; then
 	exit 0
 	EOF
 fi
-
 EOOF
 
 cat>files/usr/share/Check_Update.sh<<-'EOF'
