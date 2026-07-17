@@ -14,7 +14,7 @@ name: Update_Checker
 on:
   workflow_dispatch:
   schedule:
-     - cron: 0 0 */3 * *
+    - cron: 0 0 */3 * *
 
 jobs:
   check:
@@ -25,20 +25,25 @@ jobs:
     - name: Get Commit Hash
       id: getHash
       run: |
-        git clone  -b openwrt-25.12 https://github.com/immortalwrt/immortalwrt immortalwrt --filter=blob:none
+        # 克隆并获取 ImmortalWrt 的 Commit Hash
+        git clone -b openwrt-25.12 https://github.com/immortalwrt/immortalwrt immortalwrt --filter=blob:none
         cd immortalwrt
         echo "SHA_01=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         cd
-        #git clone -b main https://github.com/xiaorouji/openwrt-passwall openwrt-passwall --filter=blob:none
-        #cd openwrt-passwall
-        #echo "SHA_02=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-        #cd
+
+        # 克隆并获取 OpenWrt-Passwall 的 Commit Hash
+        git clone -b main https://github.com/Openwrt-Passwall/openwrt-passwall.git openwrt-passwall --filter=blob:none
+        cd openwrt-passwall
+        echo "SHA_02=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        cd
 
     - name: Show Commit Head and Combination Heads
       id: combHeader
       run: |
+        # 组合两个仓库的 Hash 值，任何一个发生变化都会改变组合值
         echo "commitHash_All=\
-          ${{steps.getHash.outputs.SHA_01}}" >> $GITHUB_OUTPUT
+          ${{steps.getHash.outputs.SHA_01}}-\
+          ${{steps.getHash.outputs.SHA_02}}" >> $GITHUB_OUTPUT
 
     - name: Compare Commit Hash
       id: cacheHash
