@@ -20,6 +20,8 @@ uci set dhcp.lan.dhcpv6='disabled'
 uci commit dhcp
 exit 0
 EOF
+#######
+chmod +x files/etc/uci-defaults/99-disable-lan-ipv6
 sed -i 's/192.168.1.1/10.103.1.2/g' package/base-files/files/bin/config_generate
 #sed -i '/^VERSION_NUMBER:=$(if/ s/24\.10-SNAPSHOT/24.10-lenyu/' include/version.mk #24.10
 #sed -i 's/KERNEL_PATCHVER:=5.15/KERNEL_PATCHVER:=5.10/g' target/linux/x86/Makefile
