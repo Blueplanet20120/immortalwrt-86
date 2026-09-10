@@ -27,4 +27,20 @@ sed -i 's/192.168.1.1/10.103.1.2/g' package/base-files/files/bin/config_generate
 #sed -i 's/KERNEL_PATCHVER:=5.15/KERNEL_PATCHVER:=5.10/g' target/linux/x86/Makefile
 #sed -i "s/.*PKG_VERSION:=.*/PKG_VERSION:=4.3.9_v1.2.14/" package/lean/qBittorrent-static/Makefile
 #sed -i 's/download-ci-llvm = true/download-ci-llvm = false/g' feeds/packages/lang/rust/Makefile
-# welcome test 
+# welcome test
+
+# xray-core 要求 go >= 1.27；openwrt-25.12 的 packages feed 仍是 1.26.8 且 GOTOOLCHAIN=local。
+# 必须在 feeds update 之后替换（写在 diy-part1.sh 会被 packages feed 覆盖）。
+rm -rf feeds/packages/lang/golang
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/immortalwrt/packages.git /tmp/iw-packages-golang
+git -C /tmp/iw-packages-golang sparse-checkout set lang/golang
+cp -a /tmp/iw-packages-golang/lang/golang feeds/packages/lang/golang
+rm -rf /tmp/iw-packages-golang
+./scripts/feeds install -a -p packages
+find feeds/packages/lang/golang -name 'golang-package.mk' -exec \
+  sed -i 's/GOTOOLCHAIN=local/GOTOOLCHAIN=auto/g' {} +
+find feeds/packages/lang/golang -name 'golang-package.mk' -exec \
+  sed -i 's|GOPROXY=off|GOPROXY=https://proxy.golang.org,direct|g' {} +
+grep -n 'GO_DEFAULT_VERSION' feeds/packages/lang/golang/golang-values.mk
+grep -n 'GOTOOLCHAIN' feeds/packages/lang/golang/golang-package.mk
