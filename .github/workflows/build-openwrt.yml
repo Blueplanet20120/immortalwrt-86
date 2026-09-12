@@ -42,6 +42,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     if: github.event.repository.owner.id == github.event.sender.id
+    permissions:
+      actions: write
+      contents: write
+      attestations: write
 
     steps:
     - name: Checkout
@@ -254,6 +258,32 @@ jobs:
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
         prerelease: true
+
+    # GitHub 仓库缓存上限约 10GB：新 key 不会自动覆盖旧条目，满了才 LRU 淘汰。
+    # 工具链只留最新 1 份，dl 只留当前 key，Update_Checker 的 HEAD-* 最多留 2 份。
+    - name: Prune old Actions caches
+      if: always()
+      env:
+        GH_TOKEN: ${{ github.token }}
+        CURRENT_DL_KEY: openwrt-dl-${{ hashFiles('.diffconfig', 'diffconfig.txt') }}
+      run: |
+        set -euo pipefail
+        REPO="${{ github.repository }}"
+        DATA=$(gh cache list -R "$REPO" --limit 100 --json id,key,createdAt)
+        echo "$DATA" | jq -r '.[] | "\(.createdAt) \(.id) \(.key)"'
+
+        delete_ids=$(echo "$DATA" | jq -r --arg dl "$CURRENT_DL_KEY" '
+          ( [.[] | select(.key | startswith("cache-openwrt"))] | sort_by(.createdAt) | reverse | .[1:] | map(.id) )
+          +
+          ( [.[] | select((.key | startswith("openwrt-dl-")) and .key != $dl)] | map(.id) )
+          +
+          ( [.[] | select(.key | startswith("HEAD-"))] | sort_by(.createdAt) | reverse | .[2:] | map(.id) )
+          | .[]
+        ')
+        for id in $delete_ids; do
+          echo "Deleting cache id=$id"
+          gh cache delete "$id" -R "$REPO" || true
+        done
 
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@main
