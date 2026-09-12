@@ -37,7 +37,12 @@ git clone --depth 1 --filter=blob:none --sparse \
 git -C /tmp/iw-packages-golang sparse-checkout set lang/golang
 cp -a /tmp/iw-packages-golang/lang/golang feeds/packages/lang/golang
 rm -rf /tmp/iw-packages-golang
+# 拷贝后必须刷新 feed 索引，否则仍按 1.26 注册，world 会报 golang1.27/host 不存在
+./scripts/feeds update -i packages
+rm -rf package/feeds/packages/golang1.26
+./scripts/feeds install golang golang1.27
 ./scripts/feeds install -a -p packages
+ls -d package/feeds/packages/golang* feeds/packages/lang/golang/golang*
 find feeds/packages/lang/golang -name 'golang-package.mk' -exec \
   sed -i 's/GOTOOLCHAIN=local/GOTOOLCHAIN=auto/g' {} +
 find feeds/packages/lang/golang -name 'golang-package.mk' -exec \
