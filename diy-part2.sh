@@ -50,7 +50,7 @@ find feeds/packages/lang/golang -name 'golang-package.mk' -exec \
 grep -n 'GO_DEFAULT_VERSION' feeds/packages/lang/golang/golang-values.mk
 grep -n 'GOTOOLCHAIN' feeds/packages/lang/golang/golang-package.mk
 
-# feeds 自带 mosdns 5.3.3：GO_PKG 缺少 /v5，quic-go 0.46 也无法在 Go 1.27 下编译
+# 保留 mosdns：只修 feeds 自带 5.3.3（缺 /v5、quic-go 过旧），不删除包
 MOSDNS_MK="feeds/packages/net/mosdns/Makefile"
 if [ -f "$MOSDNS_MK" ]; then
   sed -i 's/^PKG_VERSION:=5.3.3/PKG_VERSION:=5.3.4/' "$MOSDNS_MK"
@@ -58,3 +58,7 @@ if [ -f "$MOSDNS_MK" ]; then
   sed -i 's|^GO_PKG:=github.com/IrineSistiana/mosdns$|GO_PKG:=github.com/IrineSistiana/mosdns/v5|' "$MOSDNS_MK"
   grep -E 'PKG_VERSION|PKG_HASH|^GO_PKG:=' "$MOSDNS_MK"
 fi
+
+# 只清残缺的 nftables 模块缓存（不要整库 rm go-mod-cache，否则会拖慢到 1h+）
+rm -rf dl/go-mod-cache/github.com/google/nftables@*
+rm -rf dl/go-mod-cache/github.com/metacubex/nftables@*
