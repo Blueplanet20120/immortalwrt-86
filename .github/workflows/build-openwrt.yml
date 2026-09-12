@@ -145,27 +145,14 @@ jobs:
         cd openwrt
         echo -e 'CONFIG_DEVEL=y\nCONFIG_CCACHE=y' >> .config
         
-        # ☢️ 终极必杀技：专门对付 Host 架构的硬编码流氓判定
-        # 锁定带有 download-ci-llvm 的行，把里面的 true 全部干掉换成 false！
-        # 无论源码怎么变，它的判定逻辑最终都会变成 (...,false,false)，彻底断绝下载行为。
+        # 防 Rust 404
         if [ -f feeds/packages/lang/rust/Makefile ]; then
           sed -i '/download-ci-llvm/ s/true/false/g' feeds/packages/lang/rust/Makefile
         fi
 
-        # gettext-full host：BISON_LOCALEDIR 宏被剥引号会在 '/' 处语法错误
-        GETTEXT_MK="package/libs/gettext-full/Makefile"
-        if [ -f "$GETTEXT_MK" ]; then
-          sed -i '/BISON_LOCALEDIR/d' "$GETTEXT_MK"
-          echo 'HOST_CFLAGS += -DBISON_LOCALEDIR=\"/usr/share/locale\"' >> "$GETTEXT_MK"
-          echo 'TARGET_CFLAGS += -DBISON_LOCALEDIR=\"/usr/share/locale\"' >> "$GETTEXT_MK"
-        fi
-        rm -rf build_dir/hostpkg/gettext-*
-        rm -rf build_dir/target-*/gettext-*
-        rm -f staging_dir/host/share/aclocal/bison-i18n.m4
-
         make defconfig
 
-        # defconfig 后再锁一次，避免依赖把 shadowsocks-rust 拉回来（Rust/LLVM 极慢）
+        # defconfig 后再锁一次，防止依赖把慢包/坏包拉回来
         disable_pkg() {
           local k="$1"
           sed -i "s/^CONFIG_${k}=y/# CONFIG_${k} is not set/" .config || true
@@ -190,20 +177,10 @@ jobs:
         echo -e "$(nproc) thread compile"
         export GOPROXY=https://proxy.golang.org,direct
         export GOSUMDB=sum.golang.org
-        set +e
-        make -j$(nproc) 2>&1 | tee ../build-pass1.log
-        rc=${PIPESTATUS[0]}
-        set -e
-        if [ "$rc" -ne 0 ]; then
-          echo "===== first pass failed packages ====="
-          grep -E 'ERROR: package|failed to build' ../build-pass1.log | tail -50 || true
-          set +e
-          make -j$(nproc) V=s 2>&1 | tee ../build-pass2.log
-          rc2=${PIPESTATUS[0]}
-          set -e
-          echo "===== retry V=s failed packages ====="
-          grep -E 'ERROR: package|failed to build' ../build-pass2.log | tail -50 || true
-          exit "$rc2"
+        # 禁止失败后改成 -j1：单线程会把剩下几小时烧光
+        if ! make -j$(nproc); then
+          echo "===== retry with V=s ====="
+          make -j$(nproc) V=s
         fi
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
@@ -290,8 +267,7 @@ jobs:
         files: ${{ env.FIRMWARE }}/*
         prerelease: true
 
-    # cachewrtbuild 的 post 会在本步之后再写入一条新缓存，所以这里必须删光旧的，结束后才只剩 1 份。
-    # dl 的 key 用开头记下的 DL_CACHE_KEY（不能在这里再 hashFiles，.diffconfig 已被 mv 走）。
+    # cachewrtbuild 的 post 会在本步之后再写入新缓存，这里先删光旧的，结束后只剩 1 份
     - name: Prune old Actions caches
       if: always()
       env:
