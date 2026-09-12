@@ -80,13 +80,17 @@ jobs:
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
+        mkdir -p openwrt/dl
 
-    # cachewrtbuild 只缓存工具链/ccache，不缓存 dl/
+    # 在 mv .diffconfig 之前记下 key，否则 prune 时 hashFiles 为空会把 dl 缓存删光
+    - name: Set dl cache key
+      run: echo "DL_CACHE_KEY=openwrt-dl-${{ hashFiles('.diffconfig', 'diffconfig.txt') }}" >> "$GITHUB_ENV"
+
     - name: Cache dl
       uses: actions/cache@v5
       with:
         path: openwrt/dl
-        key: openwrt-dl-${{ hashFiles('.diffconfig', 'diffconfig.txt') }}
+        key: ${{ env.DL_CACHE_KEY }}
         restore-keys: |
           openwrt-dl-
 
@@ -259,21 +263,20 @@ jobs:
         files: ${{ env.FIRMWARE }}/*
         prerelease: true
 
-    # GitHub 仓库缓存上限约 10GB：新 key 不会自动覆盖旧条目，满了才 LRU 淘汰。
-    # 工具链只留最新 1 份，dl 只留当前 key，Update_Checker 的 HEAD-* 最多留 2 份。
+    # cachewrtbuild 的 post 会在本步之后再写入一条新缓存，所以这里必须删光旧的，结束后才只剩 1 份。
+    # dl 的 key 用开头记下的 DL_CACHE_KEY（不能在这里再 hashFiles，.diffconfig 已被 mv 走）。
     - name: Prune old Actions caches
       if: always()
       env:
         GH_TOKEN: ${{ github.token }}
-        CURRENT_DL_KEY: openwrt-dl-${{ hashFiles('.diffconfig', 'diffconfig.txt') }}
       run: |
         set -euo pipefail
         REPO="${{ github.repository }}"
         DATA=$(gh cache list -R "$REPO" --limit 100 --json id,key,createdAt)
         echo "$DATA" | jq -r '.[] | "\(.createdAt) \(.id) \(.key)"'
 
-        delete_ids=$(echo "$DATA" | jq -r --arg dl "$CURRENT_DL_KEY" '
-          ( [.[] | select(.key | startswith("cache-openwrt"))] | sort_by(.createdAt) | reverse | .[1:] | map(.id) )
+        delete_ids=$(echo "$DATA" | jq -r --arg dl "${DL_CACHE_KEY:-}" '
+          ( [.[] | select(.key | startswith("cache-openwrt"))] | map(.id) )
           +
           ( [.[] | select((.key | startswith("openwrt-dl-")) and .key != $dl)] | map(.id) )
           +
