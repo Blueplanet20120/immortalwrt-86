@@ -44,3 +44,12 @@ find feeds/packages/lang/golang -name 'golang-package.mk' -exec \
   sed -i 's|GOPROXY=off|GOPROXY=https://proxy.golang.org,direct|g' {} +
 grep -n 'GO_DEFAULT_VERSION' feeds/packages/lang/golang/golang-values.mk
 grep -n 'GOTOOLCHAIN' feeds/packages/lang/golang/golang-package.mk
+
+# feeds 自带 mosdns 5.3.3：GO_PKG 缺少 /v5，quic-go 0.46 也无法在 Go 1.27 下编译
+MOSDNS_MK="feeds/packages/net/mosdns/Makefile"
+if [ -f "$MOSDNS_MK" ]; then
+  sed -i 's/^PKG_VERSION:=5.3.3/PKG_VERSION:=5.3.4/' "$MOSDNS_MK"
+  sed -i 's/^PKG_HASH:=1d7eeaa735cb48ed2d436797d7f2a82541699f74647cd293ee411a72cdc65f5f/PKG_HASH:=0302a685db2a6c3c09af7bf4ff0dffd24f1e583383a47f064564f5270033671b/' "$MOSDNS_MK"
+  sed -i 's|^GO_PKG:=github.com/IrineSistiana/mosdns$|GO_PKG:=github.com/IrineSistiana/mosdns/v5|' "$MOSDNS_MK"
+  grep -E 'PKG_VERSION|PKG_HASH|^GO_PKG:=' "$MOSDNS_MK"
+fi
