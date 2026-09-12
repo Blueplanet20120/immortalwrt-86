@@ -76,7 +76,16 @@ jobs:
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
-   
+
+    # cachewrtbuild 只缓存工具链/ccache，不缓存 dl/
+    - name: Cache dl
+      uses: actions/cache@v5
+      with:
+        path: openwrt/dl
+        key: openwrt-dl-${{ hashFiles('.diffconfig', 'diffconfig.txt') }}
+        restore-keys: |
+          openwrt-dl-
+
     - name: Cache
       uses: klever1988/cachewrtbuild@main
       with:
@@ -94,7 +103,7 @@ jobs:
     - name: romupdate2
       run: |
         cd openwrt/package
-        git clone https://github.com/Blueplanet20120/romupdate2.git
+        git clone --depth 1 https://github.com/Blueplanet20120/romupdate2.git
         
     - name: lenyu
       run: |
@@ -134,18 +143,34 @@ jobs:
         if [ -f feeds/packages/lang/rust/Makefile ]; then
           sed -i '/download-ci-llvm/ s/true/false/g' feeds/packages/lang/rust/Makefile
         fi
-        
+
         make defconfig
-        make download -j8
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -f {} \;
+
+        # defconfig 后再锁一次，避免依赖把 shadowsocks-rust 拉回来（Rust/LLVM 极慢）
+        disable_pkg() {
+          local k="$1"
+          sed -i "s/^CONFIG_${k}=y/# CONFIG_${k} is not set/" .config || true
+          grep -q "^# CONFIG_${k} is not set" .config || echo "# CONFIG_${k} is not set" >> .config
+        }
+        disable_pkg PACKAGE_shadowsocks-rust
+        disable_pkg PACKAGE_shadowsocks-rust-sslocal
+        disable_pkg PACKAGE_shadowsocks-rust-ssserver
+        disable_pkg PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client
+        disable_pkg PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Server
+        disable_pkg PACKAGE_luci-app-ssr-plus_INCLUDE_Shadowsocks_Rust_Client
+        disable_pkg PACKAGE_luci-app-ssr-plus_INCLUDE_Shadowsocks_Rust_Server
+
+        make download -j$(nproc)
+        # 只删下载失败的残片，保留 .hash/.sha256 等本来就很小的校验文件
+        find dl -type f -size -1024c ! -name '*.hash' ! -name '*.sha256*' ! -name '*.md5' -ls -delete || true
 
     - name: Compile the firmware
       id: compile
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        make -j$(nproc) || make -j1 || make -j1 V=s
+        # 禁止失败后改成 -j1 编整个 world：单线程会把剩下几小时烧光
+        make -j$(nproc) || make -j$(nproc) V=s
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
