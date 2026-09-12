@@ -84,14 +84,15 @@ jobs:
 
     # 在 mv .diffconfig 之前记下 key，否则 prune 时 hashFiles 为空会把 dl 缓存删光
     - name: Set dl cache key
-      run: echo "DL_CACHE_KEY=openwrt-dl-${{ hashFiles('.diffconfig', 'diffconfig.txt') }}" >> "$GITHUB_ENV"
+      run: echo "DL_CACHE_KEY=openwrt-dl-v2-${{ hashFiles('.diffconfig', 'diffconfig.txt') }}" >> "$GITHUB_ENV"
 
     - name: Cache dl
       uses: actions/cache@v5
       with:
         path: openwrt/dl
-        key: ${{ env.DL_CACHE_KEY }}
+        key: openwrt-dl-v2-${{ hashFiles('.diffconfig', 'diffconfig.txt') }}
         restore-keys: |
+          openwrt-dl-v2-
           openwrt-dl-
 
     - name: Cache
@@ -167,8 +168,17 @@ jobs:
         disable_pkg PACKAGE_luci-app-ssr-plus_INCLUDE_Shadowsocks_Rust_Server
 
         make download -j$(nproc)
-        # 只删下载失败的残片，保留 .hash/.sha256 等本来就很小的校验文件
-        find dl -type f -size -1024c ! -name '*.hash' ! -name '*.sha256*' ! -name '*.md5' -ls -delete || true
+        # 只清理 dl/ 根目录下载失败的残片。
+        # 绝不能递归进 go-mod-cache：里面大量 go.mod / internal 小文件 <1KB，
+        # 删掉后会报 no required module provides package .../internal/...
+        find dl -mindepth 1 -maxdepth 1 -type f -size -1024c \
+          ! -name '*.hash' ! -name '*.sha256*' ! -name '*.md5' -ls -delete || true
+
+        # 上一版递归 find 已污染缓存里的 go-mod-cache，丢掉后由 GOPROXY 重新拉
+        rm -rf dl/go-mod-cache
+        if [ -f feeds/packages/lang/golang/golang-package.mk ]; then
+          sed -i 's|GOPROXY=off|GOPROXY=https://proxy.golang.org,direct|g' feeds/packages/lang/golang/golang-package.mk
+        fi
 
     - name: Compile the firmware
       id: compile
