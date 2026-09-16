@@ -307,19 +307,25 @@ jobs:
         retain_days: 2
         keep_minimum_runs: 10
 
-    - name: Remove old Releases
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+    - name: Keep only latest Pre-release
+      if: steps.tag.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
       env:
         GH_TOKEN: ${{ secrets.op_update }}
       run: |
         set -euo pipefail
         REPO="${{ github.repository }}"
-        KEEP=10
-        i=0
+        KEEP_TAG="${{ steps.tag.outputs.release_tag }}"
+        echo "Keeping pre-release: ${KEEP_TAG:-<newest>}"
+        RAW=$(gh api --paginate "repos/${REPO}/releases")
+        DATA=$(echo "$RAW" | jq -s 'flatten(1)')
+        # 只删旧的 Pre-release；正式版（Latest）一律不动
         while IFS= read -r tag; do
-          if [ "$i" -ge "$KEEP" ]; then
-            echo "Deleting release (and tag): $tag"
-            gh release delete "$tag" --yes --cleanup-tag -R "$REPO" || true
-          fi
-          i=$((i + 1))
-        done < <(gh api "repos/${REPO}/releases" --paginate --jq '.[] | .tag_name')
+          [ -z "$tag" ] && continue
+          echo "Deleting old pre-release + tag: $tag"
+          gh release delete "$tag" --yes --cleanup-tag -R "$REPO" || true
+        done < <(echo "$DATA" | jq -r --arg keep "$KEEP_TAG" '
+          [.[] | select(.prerelease == true and .draft == false)]
+          | sort_by(.published_at) | reverse
+          | if ($keep | length) > 0 then map(select(.tag_name != $keep)) else .[1:] end
+          | .[] | .tag_name
+        ')
