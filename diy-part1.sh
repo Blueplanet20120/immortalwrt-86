@@ -815,23 +815,36 @@ same_ver() {
 
 bin_ver() {
 	pkg="$1"
+	out="$TMP/binver.out"
+	rm -f "$out"
 	case "$pkg" in
 		xray-core)
-			[ -x /usr/bin/xray ] && /usr/bin/xray version 2>/dev/null | awk 'NR==1 { print $2; exit }'
+			[ -x /usr/bin/xray ] || return 0
+			(/usr/bin/xray version >"$out" 2>/dev/null) 2>/dev/null || true
+			awk 'NR==1 { print $2; exit }' "$out" 2>/dev/null
 			;;
 		sing-box)
-			[ -x /usr/bin/sing-box ] && /usr/bin/sing-box version 2>/dev/null | awk 'NR==1 { print $3; exit }'
+			[ -x /usr/bin/sing-box ] || return 0
+			(/usr/bin/sing-box version >"$out" 2>/dev/null) 2>/dev/null || true
+			awk 'NR==1 { print $3; exit }' "$out" 2>/dev/null
 			;;
 		chinadns-ng)
-			[ -x /usr/bin/chinadns-ng ] && /usr/bin/chinadns-ng -V 2>/dev/null | awk 'NR==1 { print $2; exit }'
+			[ -x /usr/bin/chinadns-ng ] || return 0
+			(/usr/bin/chinadns-ng -V >"$out" 2>/dev/null) 2>/dev/null || true
+			awk 'NR==1 { print $2; exit }' "$out" 2>/dev/null
 			;;
 		hysteria)
-			[ -x /usr/bin/hysteria ] && /usr/bin/hysteria version 2>/dev/null | awk '/^Version:/ { print $2; exit }'
+			[ -x /usr/bin/hysteria ] || return 0
+			(/usr/bin/hysteria version >"$out" 2>/dev/null) 2>/dev/null || true
+			awk '/^Version:/ { print $2; exit }' "$out" 2>/dev/null
 			;;
 		geoview)
-			[ -x /usr/bin/geoview ] && /usr/bin/geoview -version 2>/dev/null | awk 'NR==1 && $1=="Geoview" { print $2; exit }'
+			[ -x /usr/bin/geoview ] || return 0
+			(/usr/bin/geoview -version >"$out" 2>/dev/null) 2>/dev/null || true
+			awk 'NR==1 && $1=="Geoview" { print $2; exit }' "$out" 2>/dev/null
 			;;
 	esac
+	rm -f "$out"
 }
 
 local_ver() {
@@ -978,6 +991,18 @@ GEOVIEW_STABLE=$(upstream_ver "$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*
 echo "#### 正在安装最后时刻，请稍后…"
 PLUGINS="luci-app-passwall xray-core sing-box chinadns-ng hysteria geoview"
 for pkg in $PLUGINS; do
+	if [ "$pkg" = "sing-box" ] && [ "$PKG_KIND" = "apk" ] && [ -n "$(installed_of sing-box)" ] && [ -z "$(bin_ver sing-box || true)" ]; then
+		echo "正在重装 sing-box"
+		apk del sing-box >"$TMP/add.log" 2>&1 || true
+		apk add sing-box >"$TMP/add.log" 2>&1 || fail=1
+		if [ -z "$(bin_ver sing-box || true)" ]; then
+			echo "sing-box 重装失败"
+			fail=1
+		else
+			echo "sing-box 已是最新版本"
+		fi
+		continue
+	fi
 	inst="$(local_ver "$pkg")"
 	remote="$(cloud_feed "$pkg")"
 	use_gh=0
