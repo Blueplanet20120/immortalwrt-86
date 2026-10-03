@@ -20,11 +20,11 @@ echo "src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main" >>
 sed -i '1i src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main' feeds.conf.default
 sed -i '1i src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' feeds.conf.default
 
-# sbwml luci-app-mosdns v5：含 mosdns、luci-app-mosdns、geo2txt。
-# v2ray-geoip / v2ray-geosite 在独立仓库。golang 继续用 diy-part2 里的 1.27，不再换成 26.x。
-rm -rf package/mosdns package/v2ray-geodata
+# sbwml luci-app-mosdns v5：只要 mosdns、luci-app-mosdns、geo2txt。
+# v2ray-geoip / v2ray-geosite 继续用现有 feeds，不另装一份 v2ray-geodata。
+# golang 继续用 diy-part2 里的 1.27。
+rm -rf package/mosdns
 git clone --depth 1 -b v5 https://github.com/sbwml/luci-app-mosdns.git package/mosdns
-git clone --depth 1 https://github.com/sbwml/v2ray-geodata.git package/v2ray-geodata
 
 # Add a feed source
 
