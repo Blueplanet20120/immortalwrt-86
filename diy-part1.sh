@@ -20,6 +20,12 @@ echo "src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main" >>
 sed -i '1i src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main' feeds.conf.default
 sed -i '1i src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' feeds.conf.default
 
+# sbwml luci-app-mosdns v5：含 mosdns、luci-app-mosdns、geo2txt。
+# v2ray-geoip / v2ray-geosite 在独立仓库。golang 继续用 diy-part2 里的 1.27，不再换成 26.x。
+rm -rf package/mosdns package/v2ray-geodata
+git clone --depth 1 -b v5 https://github.com/sbwml/luci-app-mosdns.git package/mosdns
+git clone --depth 1 https://github.com/sbwml/v2ray-geodata.git package/v2ray-geodata
+
 # Add a feed source
 
 mkdir -p files/usr/share
@@ -497,6 +503,8 @@ cat>files/usr/share/Lenyu-pw.sh<<'EOF_PW'
 #   24.10、24.10-SNAPSHOT -> opkg，releases/packages-24.10
 #   25.12、25.12-SNAPSHOT -> apk，releases/packages-25.12
 #   只有发行版正好是 SNAPSHOT 才用主线快照源
+#   Lean LEDE 基线是 24.10.5（opkg）。lenyu 会把 DISTRIB_RELEASE 改成自定义修订号，
+#   这时改看 /etc/opkg/distfeeds.conf，没有版本号就按 24.10。
 # 下载的索引和公钥暂存在临时目录，退出时删除。软件源配置会留在系统里。
 #
 #   sh test-passwall-feed.sh
@@ -621,8 +629,33 @@ else
 		minor=${rest%%.*}
 		minor=${minor%%-*}
 		if ! is_num "$major" || ! is_num "$minor"; then
-			echo "无法从 DISTRIB_RELEASE=$rel 解析出版本号"
-			exit 2
+			# Lean LEDE 的 lenyu.sh 会把 DISTRIB_RELEASE 改成 2609162130_dev_Len_yu。
+			# 基线版本在 include/version.mk，当前是 24.10.5，包格式是 ipk。
+			SERIES=""
+			for feedf in /etc/opkg/distfeeds.conf /etc/apk/repositories.d/distfeeds.list; do
+				[ -f "$feedf" ] || continue
+				hit=$(sed -n 's#.*releases/\([0-9][0-9]*\.[0-9][0-9]*\).*#\1#p' "$feedf" | head -n 1)
+				if [ -n "$hit" ]; then
+					SERIES="$hit"
+					break
+				fi
+			done
+			if [ -z "$SERIES" ]; then
+				if [ "$HAS_OPKG" -eq 1 ]; then
+					SERIES="24.10"
+					echo "发行版号 $rel 不是版本号，按 LEDE 基线 24.10 使用 opkg。"
+				elif [ "$HAS_APK" -eq 1 ]; then
+					SERIES="25.12"
+					echo "发行版号 $rel 不是版本号，按 25.12 使用 apk。"
+				else
+					echo "无法从 DISTRIB_RELEASE=$rel 解析出版本号"
+					exit 2
+				fi
+			else
+				echo "发行版号 $rel 不是版本号，改用软件源里的 $SERIES。"
+			fi
+			major=${SERIES%%.*}
+			minor=${SERIES#*.}
 		fi
 		SERIES="${major}.${minor}"
 		if [ "$major" -gt 25 ] || { [ "$major" -eq 25 ] && [ "$minor" -ge 12 ]; }; then
@@ -991,10 +1024,14 @@ GEOVIEW_STABLE=$(upstream_ver "$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*
 echo "#### 正在安装最后时刻，请稍后…"
 PLUGINS="luci-app-passwall xray-core sing-box chinadns-ng hysteria geoview"
 for pkg in $PLUGINS; do
-	if [ "$pkg" = "sing-box" ] && [ "$PKG_KIND" = "apk" ] && [ -n "$(installed_of sing-box)" ] && [ -z "$(bin_ver sing-box || true)" ]; then
+	if [ "$pkg" = "sing-box" ] && [ -n "$(installed_of sing-box)" ] && [ -z "$(bin_ver sing-box || true)" ]; then
 		echo "正在重装 sing-box"
-		apk del sing-box >"$TMP/add.log" 2>&1 || true
-		apk add sing-box >"$TMP/add.log" 2>&1 || fail=1
+		if [ "$PKG_KIND" = "apk" ]; then
+			apk del sing-box >"$TMP/add.log" 2>&1 || true
+			apk add sing-box >"$TMP/add.log" 2>&1 || fail=1
+		else
+			opkg install sing-box --force-reinstall --force-overwrite >"$TMP/add.log" 2>&1 || fail=1
+		fi
 		if [ -z "$(bin_ver sing-box || true)" ]; then
 			echo "sing-box 重装失败"
 			fail=1

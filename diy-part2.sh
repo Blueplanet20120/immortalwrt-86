@@ -50,11 +50,15 @@ find feeds/packages/lang/golang -name 'golang-package.mk' -exec \
 grep -n 'GO_DEFAULT_VERSION' feeds/packages/lang/golang/golang-values.mk
 grep -n 'GOTOOLCHAIN' feeds/packages/lang/golang/golang-package.mk
 
-# 保留 mosdns：只修 feeds 自带 5.3.3（缺 /v5、quic-go 过旧），不删除包
-MOSDNS_MK="feeds/packages/net/mosdns/Makefile"
+# 用 package/mosdns（sbwml v5）替换 feeds 里的同名包，避免两份 Makefile 抢同一个包名。
+# 5.3.4 的 Go 模块路径是 github.com/IrineSistiana/mosdns/v5，上游 Makefile 仍写成不带 /v5。
+find feeds package/feeds -type d \( -name mosdns -o -name v2ray-geodata -o -name v2ray-geoip -o -name v2ray-geosite -o -name geo2txt \) ! -path 'package/mosdns' ! -path 'package/mosdns/*' ! -path 'package/v2ray-geodata' ! -path 'package/v2ray-geodata/*' -print | while read -r dir; do
+	rm -rf "$dir"
+done
+find package/feeds -type l \( -name mosdns -o -name luci-app-mosdns -o -name v2ray-geodata -o -name v2ray-geoip -o -name v2ray-geosite -o -name geo2txt \) -print -delete
+MOSDNS_MK="package/mosdns/mosdns/Makefile"
 if [ -f "$MOSDNS_MK" ]; then
-  sed -i 's/^PKG_VERSION:=5.3.3/PKG_VERSION:=5.3.4/' "$MOSDNS_MK"
-  sed -i 's/^PKG_HASH:=1d7eeaa735cb48ed2d436797d7f2a82541699f74647cd293ee411a72cdc65f5f/PKG_HASH:=0302a685db2a6c3c09af7bf4ff0dffd24f1e583383a47f064564f5270033671b/' "$MOSDNS_MK"
-  sed -i 's|^GO_PKG:=github.com/IrineSistiana/mosdns$|GO_PKG:=github.com/IrineSistiana/mosdns/v5|' "$MOSDNS_MK"
-  grep -E 'PKG_VERSION|PKG_HASH|^GO_PKG:=' "$MOSDNS_MK"
+	sed -i 's|^GO_PKG:=github.com/IrineSistiana/mosdns$|GO_PKG:=github.com/IrineSistiana/mosdns/v5|' "$MOSDNS_MK"
+	grep -E 'PKG_VERSION|^GO_PKG:=' "$MOSDNS_MK"
 fi
+./scripts/feeds update -i
