@@ -62,4 +62,11 @@ if [ -f "$MOSDNS_MK" ]; then
 	sed -i 's|^GO_PKG:=github.com/IrineSistiana/mosdns$|GO_PKG:=github.com/IrineSistiana/mosdns/v5|' "$MOSDNS_MK"
 	grep -E 'PKG_VERSION|^GO_PKG:=' "$MOSDNS_MK"
 fi
+# helloworld 的 mihomo 写死 $(STAGING_DIR_HOST)/bin/upx。
+# OpenWrt 25.12 把 feeds 里的 host 工具装到 staging_dir/hostpkg/bin，所以 upx/host 编过了也找不到。
+MIHOMO_MK="feeds/helloworld/mihomo/Makefile"
+if [ -f "$MIHOMO_MK" ]; then
+	sed -i 's|$(STAGING_DIR_HOST)/bin/upx|$(STAGING_DIR_HOSTPKG)/bin/upx|' "$MIHOMO_MK"
+	grep -n 'upx' "$MIHOMO_MK"
+fi
 ./scripts/feeds update -i
